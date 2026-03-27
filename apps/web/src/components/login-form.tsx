@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { GalleryVerticalEnd } from "lucide-react";
+import { toast } from "sonner";
 import { signIn } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,13 @@ export function LoginForm({
   const login = useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) =>
       signIn(email, password),
-    onSuccess: () => navigate({ to: "/" }),
+    onSuccess: () => {
+      toast.success("Welcome back!");
+      navigate({ to: "/" });
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
   });
 
   const form = useForm({
@@ -57,12 +64,6 @@ export function LoginForm({
               </button>
             </div>
           </div>
-
-          {login.error && (
-            <p className="text-center text-sm text-red-500">
-              {login.error.message}
-            </p>
-          )}
 
           <div className="flex flex-col gap-6">
             <form.Field
@@ -126,20 +127,11 @@ export function LoginForm({
               )}
             </form.Field>
 
-            <Button
-              type="submit"
-              className={cn(
-                "w-full",
-                login.isSuccess && "bg-green-500 hover:bg-green-600 text-white"
-              )}
-              disabled={login.isPending}
-            >
+            <Button type="submit" className="w-full" disabled={login.isPending}>
               {login.isPending ? (
                 <>
                   <Spinner /> Signing in...
                 </>
-              ) : login.isSuccess ? (
-                "Success!"
               ) : (
                 "Login"
               )}

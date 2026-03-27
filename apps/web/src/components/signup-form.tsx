@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { GalleryVerticalEnd } from "lucide-react";
+import { toast } from "sonner";
 import { signUp } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,13 @@ export function SignupForm({
         fullName: data.fullName,
         dateOfBirth: data.dateOfBirth,
       }),
-    onSuccess: () => navigate({ to: "/" }),
+    onSuccess: () => {
+      toast.success("Account created!");
+      navigate({ to: "/" });
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
   });
 
   const form = useForm({
@@ -77,12 +84,6 @@ export function SignupForm({
               </button>
             </div>
           </div>
-
-          {register.error && (
-            <p className="text-center text-sm text-red-500">
-              {register.error.message}
-            </p>
-          )}
 
           <div className="flex flex-col gap-6">
             <form.Field
@@ -230,20 +231,11 @@ export function SignupForm({
               )}
             </form.Field>
 
-            <Button
-              type="submit"
-              className={cn(
-                "w-full",
-                register.isSuccess && "bg-green-500 hover:bg-green-600 text-white"
-              )}
-              disabled={register.isPending}
-            >
+            <Button type="submit" className="w-full" disabled={register.isPending}>
               {register.isPending ? (
                 <>
                   <Spinner /> Creating account...
                 </>
-              ) : register.isSuccess ? (
-                "Success!"
               ) : (
                 "Create Account"
               )}
