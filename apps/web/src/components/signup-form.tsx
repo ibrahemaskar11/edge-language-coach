@@ -79,7 +79,7 @@ export function SignupForm({
           </div>
 
           {register.error && (
-            <p className="text-center text-sm font-semibold text-red-500">
+            <p className="text-center text-sm text-red-500">
               {register.error.message}
             </p>
           )}
@@ -232,13 +232,19 @@ export function SignupForm({
 
             <Button
               type="submit"
-              className="w-full"
+              className={cn(
+                "w-full",
+                register.isError && "bg-red-500 hover:bg-red-600 text-white",
+                register.isSuccess && "bg-green-500 hover:bg-green-600 text-white"
+              )}
               disabled={register.isPending}
             >
               {register.isPending ? (
                 <>
                   <Spinner /> Creating account...
                 </>
+              ) : register.isSuccess ? (
+                "Success!"
               ) : (
                 "Create Account"
               )}
