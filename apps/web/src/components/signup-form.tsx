@@ -259,6 +259,6 @@ function FieldError({
   if (!field.state.meta.isTouched || field.state.meta.errors.length === 0)
     return null;
   return (
-    <p className="text-sm text-red-400">{field.state.meta.errors[0]}</p>
+    <p className="text-sm text-red-500">{field.state.meta.errors[0]}</p>
   );
 }
