@@ -1,9 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
-import { GalleryVerticalEnd } from "lucide-react";
+import { GalleryVerticalEnd, CircleAlert } from "lucide-react";
 import { signIn } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,9 +60,10 @@ export function LoginForm({
           </div>
 
           {login.error && (
-            <p className="text-sm text-destructive text-center">
-              {login.error.message}
-            </p>
+            <Alert variant="destructive">
+              <CircleAlert className="h-4 w-4" />
+              <AlertDescription>{login.error.message}</AlertDescription>
+            </Alert>
           )}
 
           <div className="flex flex-col gap-6">
