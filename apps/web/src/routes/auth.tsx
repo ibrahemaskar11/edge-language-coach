@@ -2,58 +2,67 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
+import { GalleryVerticalEnd } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-  FieldSeparator,
-} from "@/components/ui/field";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
 function AuthPage() {
-  const [tab, setTab] = useState<string>("login");
+  const [mode, setMode] = useState<"login" | "register">("login");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
-      <div className="w-full max-w-[400px]">
-        <div className="mb-8 flex flex-col items-center gap-2 text-center">
-          <h1 className="text-2xl font-bold tracking-tight">edge.ai</h1>
-          <FieldDescription>
-            Your AI Italian language coach
-          </FieldDescription>
+    <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
+      <div className="w-full max-w-sm">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md">
+              <GalleryVerticalEnd className="size-6" />
+            </div>
+            <h1 className="text-xl font-bold">
+              {mode === "login" ? "Welcome back" : "Create your account"}
+            </h1>
+            <div className="text-center text-sm text-muted-foreground">
+              {mode === "login" ? (
+                <>
+                  Don&apos;t have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => setMode("register")}
+                    className="underline underline-offset-4 hover:text-primary"
+                  >
+                    Sign up
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => setMode("login")}
+                    className="underline underline-offset-4 hover:text-primary"
+                  >
+                    Log in
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {mode === "login" ? <LoginForm /> : <RegisterForm />}
+
+          <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:text-primary">
+            By clicking continue, you agree to our{" "}
+            <a href="#">Terms of Service</a> and{" "}
+            <a href="#">Privacy Policy</a>.
+          </div>
         </div>
-
-        <div className="rounded-xl border bg-card p-6 shadow-lg">
-          <Tabs value={tab} onValueChange={setTab}>
-            <TabsList className="mb-6 grid w-full grid-cols-2">
-              <TabsTrigger value="login">Log In</TabsTrigger>
-              <TabsTrigger value="register">Sign Up</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="login">
-              <LoginForm />
-            </TabsContent>
-            <TabsContent value="register">
-              <RegisterForm onSwitchToLogin={() => setTab("login")} />
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        <FieldDescription className="mt-6 text-center">
-          By continuing, you agree to our{" "}
-          <a href="#">Terms of Service</a> and{" "}
-          <a href="#">Privacy Policy</a>.
-        </FieldDescription>
       </div>
     </div>
   );
@@ -81,9 +90,9 @@ function LoginForm() {
         form.handleSubmit();
       }}
     >
-      <FieldGroup>
+      <div className="flex flex-col gap-6">
         {login.error && (
-          <FieldError>{login.error.message}</FieldError>
+          <p className="text-sm text-destructive">{login.error.message}</p>
         )}
 
         <form.Field
@@ -98,8 +107,8 @@ function LoginForm() {
           }}
         >
           {(field) => (
-            <Field>
-              <FieldLabel htmlFor="login-email">Email</FieldLabel>
+            <div className="grid gap-2">
+              <Label htmlFor="login-email">Email</Label>
               <Input
                 id="login-email"
                 type="email"
@@ -108,11 +117,8 @@ function LoginForm() {
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-              {field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0 && (
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                )}
-            </Field>
+              <FieldError field={field} />
+            </div>
           )}
         </form.Field>
 
@@ -126,8 +132,8 @@ function LoginForm() {
           }}
         >
           {(field) => (
-            <Field>
-              <FieldLabel htmlFor="login-password">Password</FieldLabel>
+            <div className="grid gap-2">
+              <Label htmlFor="login-password">Password</Label>
               <Input
                 id="login-password"
                 type="password"
@@ -135,31 +141,26 @@ function LoginForm() {
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-              {field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0 && (
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                )}
-            </Field>
+              <FieldError field={field} />
+            </div>
           )}
         </form.Field>
 
-        <Field>
-          <Button type="submit" className="w-full" disabled={login.isPending}>
-            {login.isPending ? (
-              <>
-                <Spinner /> Signing in...
-              </>
-            ) : (
-              "Log In"
-            )}
-          </Button>
-        </Field>
-      </FieldGroup>
+        <Button type="submit" className="w-full" disabled={login.isPending}>
+          {login.isPending ? (
+            <>
+              <Spinner /> Signing in...
+            </>
+          ) : (
+            "Log In"
+          )}
+        </Button>
+      </div>
     </form>
   );
 }
 
-function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
+function RegisterForm() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
 
@@ -201,9 +202,9 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
         form.handleSubmit();
       }}
     >
-      <FieldGroup>
+      <div className="flex flex-col gap-6">
         {register.error && (
-          <FieldError>{register.error.message}</FieldError>
+          <p className="text-sm text-destructive">{register.error.message}</p>
         )}
 
         <form.Field
@@ -217,8 +218,8 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
           }}
         >
           {(field) => (
-            <Field>
-              <FieldLabel htmlFor="reg-fullname">Full Name</FieldLabel>
+            <div className="grid gap-2">
+              <Label htmlFor="reg-fullname">Full Name</Label>
               <Input
                 id="reg-fullname"
                 type="text"
@@ -227,11 +228,8 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-              {field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0 && (
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                )}
-            </Field>
+              <FieldError field={field} />
+            </div>
           )}
         </form.Field>
 
@@ -240,16 +238,15 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
           validators={{
             onBlur: ({ value }) => {
               if (!value) return "Date of birth is required";
-              const date = new Date(value);
-              if (isNaN(date.getTime())) return "Invalid date";
-              if (date >= new Date()) return "Date must be in the past";
+              if (new Date(value) >= new Date())
+                return "Date must be in the past";
               return undefined;
             },
           }}
         >
           {(field) => (
-            <Field>
-              <FieldLabel htmlFor="reg-dob">Date of Birth</FieldLabel>
+            <div className="grid gap-2">
+              <Label htmlFor="reg-dob">Date of Birth</Label>
               <Input
                 id="reg-dob"
                 type="date"
@@ -257,15 +254,16 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-              {field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0 && (
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                )}
-            </Field>
+              <FieldError field={field} />
+            </div>
           )}
         </form.Field>
 
-        <FieldSeparator />
+        <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border">
+          <span className="relative z-10 bg-background px-2 text-muted-foreground">
+            Account details
+          </span>
+        </div>
 
         <form.Field
           name="email"
@@ -279,8 +277,8 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
           }}
         >
           {(field) => (
-            <Field>
-              <FieldLabel htmlFor="reg-email">Email</FieldLabel>
+            <div className="grid gap-2">
+              <Label htmlFor="reg-email">Email</Label>
               <Input
                 id="reg-email"
                 type="email"
@@ -289,11 +287,8 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-              {field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0 && (
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                )}
-            </Field>
+              <FieldError field={field} />
+            </div>
           )}
         </form.Field>
 
@@ -309,8 +304,8 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
           }}
         >
           {(field) => (
-            <Field>
-              <FieldLabel htmlFor="reg-password">Password</FieldLabel>
+            <div className="grid gap-2">
+              <Label htmlFor="reg-password">Password</Label>
               <Input
                 id="reg-password"
                 type="password"
@@ -318,11 +313,8 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-              {field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0 && (
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                )}
-            </Field>
+              <FieldError field={field} />
+            </div>
           )}
         </form.Field>
 
@@ -332,21 +324,21 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
             onChangeListenTo: ["password"],
             onBlur: ({ value, fieldApi }) => {
               if (!value) return "Please confirm your password";
-              const password = fieldApi.form.getFieldValue("password");
-              if (value !== password) return "Passwords do not match";
+              if (value !== fieldApi.form.getFieldValue("password"))
+                return "Passwords do not match";
               return undefined;
             },
             onChange: ({ value, fieldApi }) => {
               if (!fieldApi.state.meta.isTouched) return undefined;
-              const password = fieldApi.form.getFieldValue("password");
-              if (value && value !== password) return "Passwords do not match";
+              if (value && value !== fieldApi.form.getFieldValue("password"))
+                return "Passwords do not match";
               return undefined;
             },
           }}
         >
           {(field) => (
-            <Field>
-              <FieldLabel htmlFor="reg-confirm">Confirm Password</FieldLabel>
+            <div className="grid gap-2">
+              <Label htmlFor="reg-confirm">Confirm Password</Label>
               <Input
                 id="reg-confirm"
                 type="password"
@@ -354,30 +346,33 @@ function RegisterForm({ onSwitchToLogin }: { onSwitchToLogin: () => void }) {
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
               />
-              {field.state.meta.isTouched &&
-                field.state.meta.errors.length > 0 && (
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                )}
-            </Field>
+              <FieldError field={field} />
+            </div>
           )}
         </form.Field>
 
-        <Field>
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={register.isPending}
-          >
-            {register.isPending ? (
-              <>
-                <Spinner /> Creating account...
-              </>
-            ) : (
-              "Create Account"
-            )}
-          </Button>
-        </Field>
-      </FieldGroup>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={register.isPending}
+        >
+          {register.isPending ? (
+            <>
+              <Spinner /> Creating account...
+            </>
+          ) : (
+            "Create Account"
+          )}
+        </Button>
+      </div>
     </form>
+  );
+}
+
+function FieldError({ field }: { field: { state: { meta: { isTouched: boolean; errors: string[] } } } }) {
+  if (!field.state.meta.isTouched || field.state.meta.errors.length === 0)
+    return null;
+  return (
+    <p className="text-sm text-destructive">{field.state.meta.errors[0]}</p>
   );
 }
