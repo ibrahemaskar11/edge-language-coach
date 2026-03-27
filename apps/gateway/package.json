@@ -14,16 +14,18 @@
     "@edge/shared": "workspace:*",
     "@fastify/cors": "^11",
     "@fastify/multipart": "^9",
+    "@supabase/supabase-js": "^2",
+    "dotenv": "^16",
     "fastify": "^5",
     "fastify-plugin": "^5",
     "groq-sdk": "^0.15",
-    "@supabase/supabase-js": "^2",
-    "dotenv": "^16",
+    "jsonwebtoken": "^9.0.3",
     "zod": "^3"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22",
     "tsx": "^4",
-    "typescript": "^5",
-    "@types/node": "^22"
+    "typescript": "^5"
   }
 }
