@@ -2,6 +2,8 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { env } from "./env.js";
 import { prismaPlugin } from "./plugins/prisma.js";
+import { authPlugin } from "./plugins/auth.js";
+import { authRoutes } from "./routes/auth.js";
 
 const app = Fastify({ logger: true });
 
@@ -11,6 +13,8 @@ await app.register(cors, {
 });
 
 await app.register(prismaPlugin);
+await app.register(authPlugin);
+await app.register(authRoutes);
 
 app.get("/health", async () => ({ status: "ok" }));
 
