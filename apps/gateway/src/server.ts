@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { env } from "./env.js";
-import { prismaPlugin } from "./plugins/prisma.js";
+import { supabasePlugin } from "./plugins/supabase.js";
 import { authPlugin } from "./plugins/auth.js";
 import { authRoutes } from "./routes/auth.js";
 
@@ -12,7 +12,7 @@ await app.register(cors, {
   credentials: true,
 });
 
-await app.register(prismaPlugin);
+await app.register(supabasePlugin);
 await app.register(authPlugin);
 await app.register(authRoutes);
 

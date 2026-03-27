@@ -6,12 +6,19 @@ export async function authRoutes(fastify: FastifyInstance) {
   }>("/api/auth/callback", async (request, reply) => {
     const { userId, email, fullName } = request.body;
 
-    const profile = await fastify.prisma.profile.upsert({
-      where: { id: userId },
-      update: { email, fullName },
-      create: { id: userId, email, fullName },
-    });
+    const { data, error } = await fastify.supabase
+      .from("profiles")
+      .upsert(
+        { id: userId, email, full_name: fullName },
+        { onConflict: "id" }
+      )
+      .select()
+      .single();
 
-    return reply.send(profile);
+    if (error) {
+      return reply.status(500).send({ message: error.message });
+    }
+
+    return reply.send(data);
   });
 }
