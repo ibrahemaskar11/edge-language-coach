@@ -1,10 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
-import { GalleryVerticalEnd, CircleAlert } from "lucide-react";
+import { GalleryVerticalEnd } from "lucide-react";
 import { signUp } from "@/lib/auth";
 import { cn } from "@/lib/utils";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,10 +79,9 @@ export function SignupForm({
           </div>
 
           {register.error && (
-            <Alert variant="destructive">
-              <CircleAlert className="h-4 w-4" />
-              <AlertDescription>{register.error.message}</AlertDescription>
-            </Alert>
+            <p className="text-center text-sm font-semibold text-red-500">
+              {register.error.message}
+            </p>
           )}
 
           <div className="flex flex-col gap-6">
