@@ -2,6 +2,7 @@ import { createRootRoute, Outlet } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuthStore } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -19,6 +20,7 @@ function RootLayout() {
     <>
       <Outlet />
       <ThemeToggle />
+      <Toaster richColors />
     </>
   );
 }
