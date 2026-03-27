@@ -35,6 +35,9 @@ importers:
       fastify:
         specifier: ^5
         version: 5.8.4
+      fastify-plugin:
+        specifier: ^5
+        version: 5.1.0
       groq-sdk:
         specifier: ^0.15
         version: 0.15.0
