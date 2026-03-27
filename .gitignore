@@ -11,6 +11,12 @@ packages/db/generated/
 # Vite
 apps/web/.vite/
 
+# Supabase
+supabase/.temp/
+
+# MCP
+.mcp.json
+
 # OS
 .DS_Store
 Thumbs.db

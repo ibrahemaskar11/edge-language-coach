@@ -14,7 +14,7 @@ function HomePage() {
 
   useEffect(() => {
     if (!loading && !user) {
-      navigate({ to: "/login" });
+      navigate({ to: "/auth" });
     }
   }, [loading, user, navigate]);
 
