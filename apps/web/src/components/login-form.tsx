@@ -90,7 +90,7 @@ export function LoginForm({
                   />
                   {field.state.meta.isTouched &&
                     field.state.meta.errors.length > 0 && (
-                      <p className="text-sm text-destructive">
+                      <p className="text-sm text-red-400">
                         {field.state.meta.errors[0]}
                       </p>
                     )}
@@ -119,7 +119,7 @@ export function LoginForm({
                   />
                   {field.state.meta.isTouched &&
                     field.state.meta.errors.length > 0 && (
-                      <p className="text-sm text-destructive">
+                      <p className="text-sm text-red-400">
                         {field.state.meta.errors[0]}
                       </p>
                     )}
