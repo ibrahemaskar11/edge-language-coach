@@ -59,7 +59,7 @@ export function LoginForm({
           </div>
 
           {login.error && (
-            <p className="text-center text-sm font-semibold text-red-500">
+            <p className="text-center text-sm text-red-500">
               {login.error.message}
             </p>
           )}
@@ -126,11 +126,21 @@ export function LoginForm({
               )}
             </form.Field>
 
-            <Button type="submit" className="w-full" disabled={login.isPending}>
+            <Button
+              type="submit"
+              className={cn(
+                "w-full",
+                login.isError && "bg-red-500 hover:bg-red-600 text-white",
+                login.isSuccess && "bg-green-500 hover:bg-green-600 text-white"
+              )}
+              disabled={login.isPending}
+            >
               {login.isPending ? (
                 <>
                   <Spinner /> Signing in...
                 </>
+              ) : login.isSuccess ? (
+                "Success!"
               ) : (
                 "Login"
               )}
