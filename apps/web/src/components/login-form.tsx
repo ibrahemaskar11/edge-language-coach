@@ -130,7 +130,6 @@ export function LoginForm({
               type="submit"
               className={cn(
                 "w-full",
-                login.isError && "bg-red-500 hover:bg-red-600 text-white",
                 login.isSuccess && "bg-green-500 hover:bg-green-600 text-white"
               )}
               disabled={login.isPending}

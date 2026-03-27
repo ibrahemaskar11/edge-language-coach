@@ -234,7 +234,6 @@ export function SignupForm({
               type="submit"
               className={cn(
                 "w-full",
-                register.isError && "bg-red-500 hover:bg-red-600 text-white",
                 register.isSuccess && "bg-green-500 hover:bg-green-600 text-white"
               )}
               disabled={register.isPending}
