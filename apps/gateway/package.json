@@ -1,0 +1,28 @@
+{
+  "name": "@edge/gateway",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@edge/db": "workspace:*",
+    "@edge/shared": "workspace:*",
+    "@fastify/cors": "^11",
+    "@fastify/multipart": "^9",
+    "fastify": "^5",
+    "groq-sdk": "^0.15",
+    "@supabase/supabase-js": "^2",
+    "dotenv": "^16",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "tsx": "^4",
+    "typescript": "^5",
+    "@types/node": "^22"
+  }
+}

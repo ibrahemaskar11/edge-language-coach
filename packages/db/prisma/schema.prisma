@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Profile {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  fullName  String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sessions Session[]
+
+  @@map("profiles")
+}
+
+model Topic {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  level       String   @default("B2")
+  category    String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  sessions Session[]
+
+  @@map("topics")
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  topicId    String   @map("topic_id")
+  audioUrl   String?  @map("audio_url")
+  transcript String?
+  status     String   @default("recording")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     Profile    @relation(fields: [userId], references: [id])
+  topic    Topic      @relation(fields: [topicId], references: [id])
+  feedback Feedback[]
+
+  @@map("sessions")
+}
+
+model Feedback {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  type      String
+  content   Json
+  turn      Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  session Session @relation(fields: [sessionId], references: [id])
+
+  @@map("feedback")
+}

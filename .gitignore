@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.turbo/
+.env
+.env.local
+*.log
+
+# Prisma
+packages/db/generated/
+
+# Vite
+apps/web/.vite/
+
+# OS
+.DS_Store
+Thumbs.db
