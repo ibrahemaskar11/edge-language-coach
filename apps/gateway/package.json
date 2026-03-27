@@ -15,6 +15,7 @@
     "@fastify/cors": "^11",
     "@fastify/multipart": "^9",
     "fastify": "^5",
+    "fastify-plugin": "^5",
     "groq-sdk": "^0.15",
     "@supabase/supabase-js": "^2",
     "dotenv": "^16",
