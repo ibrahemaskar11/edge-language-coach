@@ -1,10 +1,10 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, Link } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
-import { GalleryVerticalEnd } from "lucide-react";
 import { toast } from "sonner";
 import { signUp } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,11 +12,8 @@ import { Spinner } from "@/components/ui/spinner";
 
 export function SignupForm({
   className,
-  onSwitchToLogin,
   ...props
-}: React.ComponentPropsWithoutRef<"div"> & {
-  onSwitchToLogin: () => void;
-}) {
+}: React.ComponentPropsWithoutRef<"div">) {
   const navigate = useNavigate();
 
   const register = useMutation({
@@ -66,22 +63,15 @@ export function SignupForm({
       >
         <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-2">
-            <a href="#" className="flex flex-col items-center gap-2 font-medium">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md">
-                <GalleryVerticalEnd className="size-6" />
-              </div>
-              <span className="sr-only">edge.ai</span>
-            </a>
+            <div className="flex flex-col items-center gap-2">
+              <Logo size={40} />
+            </div>
             <h1 className="text-xl font-bold">Create your account</h1>
             <div className="text-center text-sm">
               Already have an account?{" "}
-              <button
-                type="button"
-                onClick={onSwitchToLogin}
-                className="underline underline-offset-4"
-              >
+              <Link to="/login" className="underline underline-offset-4">
                 Log in
-              </button>
+              </Link>
             </div>
           </div>
 

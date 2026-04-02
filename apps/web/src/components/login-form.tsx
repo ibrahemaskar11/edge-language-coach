@@ -1,10 +1,10 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, Link } from "@tanstack/react-router";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
-import { GalleryVerticalEnd } from "lucide-react";
 import { toast } from "sonner";
 import { signIn } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,11 +12,8 @@ import { Spinner } from "@/components/ui/spinner";
 
 export function LoginForm({
   className,
-  onSwitchToRegister,
   ...props
-}: React.ComponentPropsWithoutRef<"div"> & {
-  onSwitchToRegister: () => void;
-}) {
+}: React.ComponentPropsWithoutRef<"div">) {
   const navigate = useNavigate();
 
   const login = useMutation({
@@ -46,22 +43,15 @@ export function LoginForm({
       >
         <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-2">
-            <a href="#" className="flex flex-col items-center gap-2 font-medium">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md">
-                <GalleryVerticalEnd className="size-6" />
-              </div>
-              <span className="sr-only">edge.ai</span>
-            </a>
+            <div className="flex flex-col items-center gap-2">
+              <Logo size={40} />
+            </div>
             <h1 className="text-xl font-bold">Welcome back</h1>
             <div className="text-center text-sm">
               Don&apos;t have an account?{" "}
-              <button
-                type="button"
-                onClick={onSwitchToRegister}
-                className="underline underline-offset-4"
-              >
+              <Link to="/register" className="underline underline-offset-4">
                 Sign up
-              </button>
+              </Link>
             </div>
           </div>
 
