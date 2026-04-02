@@ -1,7 +1,5 @@
 import fp from "fastify-plugin";
-import jwt from "jsonwebtoken";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { env } from "../env.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -31,16 +29,17 @@ export const authPlugin = fp(async (fastify: FastifyInstance) => {
 
       const token = authHeader.slice(7);
 
-      try {
-        const payload = jwt.verify(token, env.SUPABASE_JWT_SECRET) as {
-          sub: string;
-          email: string;
-        };
-        request.userId = payload.sub;
-        request.userEmail = payload.email;
-      } catch {
+      const {
+        data: { user },
+        error,
+      } = await fastify.supabase.auth.getUser(token);
+
+      if (error || !user) {
         return reply.status(401).send({ message: "Invalid token" });
       }
+
+      request.userId = user.id;
+      request.userEmail = user.email ?? "";
     }
   );
 });
