@@ -4,4 +4,7 @@ export type {
   Topic,
   Session,
   Feedback,
+  Flashcard,
+  UserFlashcard,
+  UserTopic,
 } from "./generated/prisma/client.js";

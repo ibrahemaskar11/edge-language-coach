@@ -10,29 +10,78 @@ datasource db {
 }
 
 model Profile {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id          String   @id @default(uuid())
+  email       String   @unique
   fullName    String?
   dateOfBirth DateTime? @db.Date @map("date_of_birth")
   createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  sessions Session[]
+  sessions       Session[]
+  userTopics     UserTopic[]
+  userFlashcards UserFlashcard[]
 
   @@map("profiles")
 }
 
 model Topic {
-  id          String   @id @default(uuid())
-  title       String
-  description String
-  level       String   @default("B2")
-  category    String
-  createdAt   DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  title         String
+  description   String
+  level         String   @default("B2")
+  category      String
+  talkingPoints String[] @default([]) @map("talking_points")
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  sessions Session[]
+  sessions   Session[]
+  flashcards Flashcard[]
+  userTopics UserTopic[]
 
   @@map("topics")
+}
+
+model UserTopic {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  topicId   String   @map("topic_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  Profile @relation(fields: [userId], references: [id])
+  topic Topic   @relation(fields: [topicId], references: [id])
+
+  @@unique([userId, topicId])
+  @@map("user_topics")
+}
+
+model Flashcard {
+  id        String   @id @default(uuid())
+  topicId   String   @map("topic_id")
+  type      String
+  front     String
+  back      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  topic          Topic           @relation(fields: [topicId], references: [id])
+  userFlashcards UserFlashcard[]
+
+  @@map("flashcards")
+}
+
+model UserFlashcard {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  flashcardId String   @map("flashcard_id")
+  ease        Float    @default(2.5)
+  interval    Int      @default(1)
+  nextReview  DateTime @default(now()) @map("next_review")
+  reviewCount Int      @default(0) @map("review_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      Profile   @relation(fields: [userId], references: [id])
+  flashcard Flashcard @relation(fields: [flashcardId], references: [id])
+
+  @@unique([userId, flashcardId])
+  @@map("user_flashcards")
 }
 
 model Session {

@@ -8,6 +8,7 @@ export const topicSchema = z.object({
   description: z.string(),
   level: z.string(),
   category: z.string(),
+  talkingPoints: z.array(z.string()).optional(),
   createdAt: z.string().datetime(),
 });
 
@@ -84,3 +85,54 @@ export const coachResponseSchema = feedbackContentSchema;
 
 export type TranscribeResponse = z.infer<typeof transcribeResponseSchema>;
 export type CoachResponse = z.infer<typeof coachResponseSchema>;
+
+// ─── Mutation Inputs ────────────────────────────────────
+
+export const updateSessionSchema = z.object({
+  transcript: z.string().optional(),
+  status: sessionStatusEnum.optional(),
+  audioUrl: z.string().optional(),
+});
+
+export type UpdateSessionInput = z.infer<typeof updateSessionSchema>;
+
+export const createFeedbackSchema = z.object({
+  type: z.enum(["mistakes", "good_points", "follow_up"]),
+  content: z.unknown(),
+  turn: z.number().int().positive(),
+});
+
+export type CreateFeedbackInput = z.infer<typeof createFeedbackSchema>;
+
+// ─── Flashcards ─────────────────────────────────────────
+
+export const flashcardSchema = z.object({
+  id: z.string().uuid(),
+  topicId: z.string().uuid(),
+  type: z.string(),
+  front: z.string(),
+  back: z.string(),
+  createdAt: z.string().datetime(),
+});
+
+export type Flashcard = z.infer<typeof flashcardSchema>;
+
+export const userFlashcardSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  flashcardId: z.string().uuid(),
+  ease: z.number(),
+  interval: z.number().int(),
+  nextReview: z.string().datetime(),
+  reviewCount: z.number().int(),
+  createdAt: z.string().datetime(),
+  flashcard: flashcardSchema.optional(),
+});
+
+export type UserFlashcard = z.infer<typeof userFlashcardSchema>;
+
+export const reviewFlashcardSchema = z.object({
+  rating: z.enum(["hard", "good", "easy"]),
+});
+
+export type ReviewFlashcardInput = z.infer<typeof reviewFlashcardSchema>;

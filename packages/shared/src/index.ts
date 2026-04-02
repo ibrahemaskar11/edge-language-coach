@@ -9,16 +9,26 @@ export {
   feedbackSchema,
   transcribeResponseSchema,
   coachResponseSchema,
+  updateSessionSchema,
+  createFeedbackSchema,
+  flashcardSchema,
+  userFlashcardSchema,
+  reviewFlashcardSchema,
 } from "./schemas.js";
 
 export type {
   Topic,
   CreateSessionInput,
+  UpdateSessionInput,
   Session,
   Mistake,
   GoodPoint,
   FeedbackContent,
   Feedback,
+  CreateFeedbackInput,
   TranscribeResponse,
   CoachResponse,
+  Flashcard,
+  UserFlashcard,
+  ReviewFlashcardInput,
 } from "./schemas.js";
