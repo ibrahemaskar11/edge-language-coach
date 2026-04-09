@@ -34,7 +34,7 @@ export async function sessionRoutes(fastify: FastifyInstance) {
       .insert({
         user_id: request.userId,
         topic_id: body.topicId,
-        status: "recording",
+        status: "coaching",
       })
       .select("*, topic:topics(*)")
       .single();
