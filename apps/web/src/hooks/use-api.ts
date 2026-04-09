@@ -5,6 +5,7 @@ import type {
   UpdateSessionInput,
   CreateFeedbackInput,
   ReviewFlashcardInput,
+  SendMessageInput,
 } from "@edge/shared";
 
 // ─── Topics ─────────────────────────────────────────────
@@ -113,6 +114,40 @@ export function useReviewFlashcard() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["flashcards"] });
       qc.invalidateQueries({ queryKey: ["flashcard-decks"] });
+    },
+  });
+}
+
+// ─── Messages ────────────────────────────────────────────
+export function useMessages(sessionId: string) {
+  return useQuery({
+    queryKey: ["messages", sessionId],
+    queryFn: () => api.fetchMessages(sessionId),
+    enabled: !!sessionId,
+  });
+}
+
+export function useSendMessage(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: SendMessageInput) => api.sendMessage(sessionId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["messages", sessionId] });
+      qc.invalidateQueries({ queryKey: ["sessions", sessionId] });
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+      qc.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
+
+export function useEndSession(sessionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.endSession(sessionId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sessions", sessionId] });
+      qc.invalidateQueries({ queryKey: ["sessions"] });
+      qc.invalidateQueries({ queryKey: ["stats"] });
     },
   });
 }

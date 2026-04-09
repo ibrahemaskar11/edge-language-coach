@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { useTopic, useCreateSession } from "@/hooks/use-api";
+import { useTopic } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/_authenticated/topics/$topicId")({
   component: TopicDetailPage,
@@ -12,7 +12,6 @@ export const Route = createFileRoute("/_authenticated/topics/$topicId")({
 function TopicDetailPage() {
   const { topicId } = Route.useParams();
   const { data: topic, isLoading } = useTopic(topicId);
-  const createSession = useCreateSession();
   const navigate = useNavigate();
 
   if (isLoading) {
@@ -35,14 +34,7 @@ function TopicDetailPage() {
   }
 
   const handleStartSession = () => {
-    createSession.mutate(
-      { topicId },
-      {
-        onSuccess: () => {
-          navigate({ to: "/session/$topicId", params: { topicId } });
-        },
-      }
-    );
+    navigate({ to: "/session/$topicId", params: { topicId } });
   };
 
   return (
@@ -97,8 +89,8 @@ function TopicDetailPage() {
         </section>
       )}
 
-      <Button onClick={handleStartSession} disabled={createSession.isPending}>
-        {createSession.isPending ? "Starting..." : "Start Session \u2192"}
+      <Button onClick={handleStartSession}>
+        Start Session →
       </Button>
     </div>
   );
