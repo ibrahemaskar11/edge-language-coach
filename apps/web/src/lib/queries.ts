@@ -8,6 +8,9 @@ import type {
   CreateFeedbackInput,
   UserFlashcard,
   ReviewFlashcardInput,
+  Message,
+  SendMessageInput,
+  CoachTurnResponse,
 } from "@edge/shared";
 
 // ─── Topics ─────────────────────────────────────────────
@@ -79,3 +82,16 @@ export const reviewFlashcard = (id: string, body: ReviewFlashcardInput) =>
     method: "POST",
     body: JSON.stringify(body),
   });
+
+// ─── Messages ────────────────────────────────────────────
+export const fetchMessages = (sessionId: string) =>
+  apiFetch<Message[]>(`/sessions/${sessionId}/messages`);
+
+export const sendMessage = (sessionId: string, body: SendMessageInput) =>
+  apiFetch<CoachTurnResponse>(`/sessions/${sessionId}/messages`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const endSession = (sessionId: string) =>
+  apiFetch<Session>(`/sessions/${sessionId}/end`, { method: "POST" });
