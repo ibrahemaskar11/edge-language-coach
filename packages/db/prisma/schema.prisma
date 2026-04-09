@@ -96,6 +96,7 @@ model Session {
   user     Profile    @relation(fields: [userId], references: [id])
   topic    Topic      @relation(fields: [topicId], references: [id])
   feedback Feedback[]
+  messages Message[]
 
   @@map("sessions")
 }
@@ -111,4 +112,17 @@ model Feedback {
   session Session @relation(fields: [sessionId], references: [id])
 
   @@map("feedback")
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  role      String
+  content   String
+  turn      Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  session Session @relation(fields: [sessionId], references: [id])
+
+  @@map("messages")
 }

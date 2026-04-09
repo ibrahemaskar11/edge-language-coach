@@ -14,6 +14,10 @@ export {
   flashcardSchema,
   userFlashcardSchema,
   reviewFlashcardSchema,
+  messageSchema,
+  sendMessageSchema,
+  llmCoachResponseSchema,
+  coachTurnResponseSchema,
 } from "./schemas.js";
 
 export type {
@@ -31,4 +35,8 @@ export type {
   Flashcard,
   UserFlashcard,
   ReviewFlashcardInput,
+  Message,
+  SendMessageInput,
+  LlmCoachResponse,
+  CoachTurnResponse,
 } from "./schemas.js";
