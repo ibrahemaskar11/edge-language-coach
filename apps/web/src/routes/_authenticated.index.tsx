@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { useAuthStore } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { useTopics, useStats, useSessions, useFlashcardDecks } from "@/hooks/use-api";
+import { useTopics, useStats, useSessions, useFlashcardDecks, useRecommendedTopics } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/_authenticated/")({
   component: PlaygroundPage,
@@ -20,8 +20,9 @@ function PlaygroundPage() {
   const { data: stats, isLoading: statsLoading } = useStats();
   const { data: sessions, isLoading: sessionsLoading } = useSessions();
   const { data: decks } = useFlashcardDecks();
+  const { data: recommendedData, isLoading: recLoading } = useRecommendedTopics();
 
-  const isLoading = topicsLoading || statsLoading || sessionsLoading;
+  const isLoading = topicsLoading || statsLoading || sessionsLoading || recLoading;
 
   if (isLoading) {
     return (
@@ -31,7 +32,7 @@ function PlaygroundPage() {
     );
   }
 
-  const recommendedTopics = topics?.slice(0, 4) ?? [];
+  const recommendedTopics = recommendedData?.slice(0, 4) ?? topics?.slice(0, 4) ?? [];
   const recentSessions = stats?.recentSessions ?? sessions?.slice(0, 3) ?? [];
   const totalDue = decks?.reduce((sum, d) => sum + d.dueToday, 0) ?? 0;
 

@@ -6,6 +6,7 @@ export async function topicRoutes(fastify: FastifyInstance) {
     const { data, error } = await fastify.supabase
       .from("topics")
       .select("*")
+      .eq("is_active", true)
       .order("created_at", { ascending: false });
 
     if (error) return reply.status(500).send({ message: error.message });

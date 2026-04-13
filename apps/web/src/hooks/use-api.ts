@@ -140,6 +140,15 @@ export function useSendMessage(sessionId: string) {
   });
 }
 
+// ─── Recommendations ─────────────────────────────────────
+export function useRecommendedTopics() {
+  return useQuery({
+    queryKey: ["recommendations"],
+    queryFn: api.fetchRecommendedTopics,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useEndSession(sessionId: string) {
   const qc = useQueryClient();
   return useMutation({

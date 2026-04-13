@@ -1,0 +1,7 @@
+go 1.23
+
+use (
+	./services/flashcard-generator
+	./services/recommendations
+	./services/topic-scraper
+)
