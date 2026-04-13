@@ -1,104 +1,43 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
+import { useReport } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/_authenticated/reports/$reportId")({
   component: ReportDetailPage,
 });
 
-const mockReportData: Record<
-  string,
-  {
-    week: string;
-    summary: string;
-    stats: { value: string; label: string }[];
-    sessions: { topic: string; score: string }[];
-    mistakes: string[];
-    strengths: string[];
-  }
-> = {
-  "mar-24": {
-    week: "Week of Mar 24, 2026",
-    summary: "5 sessions · 32 flashcards reviewed · 78% grammar accuracy",
-    stats: [
-      { value: "5", label: "Sessions completed" },
-      { value: "32", label: "Flashcards reviewed" },
-      { value: "78%", label: "Grammar accuracy" },
-      { value: "4.2", label: "Avg turns per session" },
-    ],
-    sessions: [
-      { topic: "Technology & Society", score: "Score: 7/10" },
-      { topic: "Italian Culture & Identity", score: "Score: 8/10" },
-      { topic: "Sustainable Living", score: "Score: 6/10" },
-      { topic: "Work-Life Balance", score: "Score: 9/10" },
-      { topic: "Education Systems", score: "Score: 7/10" },
-    ],
-    mistakes: [
-      "Subjunctive mood — 8 occurrences",
-      "Article agreement — 5 occurrences",
-      'Preposition "di" vs "da" — 3 occ.',
-    ],
-    strengths: [
-      "Vocabulary range — above average",
-      "Pronunciation fluency — improving",
-      "Past tense usage — consistent",
-    ],
-  },
-  "mar-17": {
-    week: "Week of Mar 17, 2026",
-    summary: "3 sessions · 18 flashcards reviewed · 72% grammar accuracy",
-    stats: [
-      { value: "3", label: "Sessions completed" },
-      { value: "18", label: "Flashcards reviewed" },
-      { value: "72%", label: "Grammar accuracy" },
-      { value: "3.7", label: "Avg turns per session" },
-    ],
-    sessions: [
-      { topic: "Technology & Society", score: "Score: 6/10" },
-      { topic: "Italian Culture & Identity", score: "Score: 7/10" },
-      { topic: "Education Systems", score: "Score: 8/10" },
-    ],
-    mistakes: [
-      "Subjunctive mood — 6 occurrences",
-      "Conditional tense — 4 occurrences",
-      "Word order — 3 occurrences",
-    ],
-    strengths: [
-      "Vocabulary range — improving",
-      "Listening comprehension — strong",
-      "Cultural references — natural",
-    ],
-  },
-  "mar-10": {
-    week: "Week of Mar 10, 2026",
-    summary: "4 sessions · 25 flashcards reviewed · 75% grammar accuracy",
-    stats: [
-      { value: "4", label: "Sessions completed" },
-      { value: "25", label: "Flashcards reviewed" },
-      { value: "75%", label: "Grammar accuracy" },
-      { value: "4.0", label: "Avg turns per session" },
-    ],
-    sessions: [
-      { topic: "Sustainable Living", score: "Score: 7/10" },
-      { topic: "Work-Life Balance", score: "Score: 8/10" },
-      { topic: "Social Media Impact", score: "Score: 6/10" },
-      { topic: "Technology & Society", score: "Score: 7/10" },
-    ],
-    mistakes: [
-      "Subjunctive mood — 5 occurrences",
-      "Article agreement — 4 occurrences",
-      "Reflexive verbs — 3 occurrences",
-    ],
-    strengths: [
-      "Pronunciation fluency — above average",
-      "Vocabulary range — consistent",
-      "Conversation flow — natural",
-    ],
-  },
-};
-
 function ReportDetailPage() {
   const { reportId } = Route.useParams();
-  const report = mockReportData[reportId] ?? mockReportData["mar-24"]!;
+  const { data: report, isLoading, error } = useReport(reportId);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Spinner className="h-6 w-6" />
+      </div>
+    );
+  }
+
+  if (error || !report) {
+    return (
+      <div className="space-y-4">
+        <Link to="/reports" className="text-sm text-muted-foreground hover:text-foreground">
+          &larr; Back to Reports
+        </Link>
+        <p className="text-sm text-muted-foreground">Report not found.</p>
+      </div>
+    );
+  }
+
+  const completedSessions = report.sessions.filter((s) => s.status === "complete");
+  const scoredSessions = completedSessions.filter((s) => s.score !== null);
+  const avgScore =
+    scoredSessions.length > 0
+      ? Math.round(
+          scoredSessions.reduce((sum, s) => sum + (s.score ?? 0), 0) / scoredSessions.length
+        )
+      : null;
 
   return (
     <div className="space-y-10">
@@ -110,13 +49,22 @@ function ReportDetailPage() {
       </Link>
 
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">{report.week}</h1>
-        <p className="mt-1 text-muted-foreground">{report.summary}</p>
+        <h1 className="text-3xl font-bold tracking-tight">{report.weekLabel}</h1>
+        <p className="mt-1 text-muted-foreground">
+          {report.sessions.length} {report.sessions.length === 1 ? "session" : "sessions"} &middot;{" "}
+          {completedSessions.length} completed
+          {avgScore !== null ? ` \u00b7 avg score ${avgScore}/10` : ""}
+        </p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {report.stats.map((stat) => (
+        {[
+          { value: String(report.sessions.length), label: "Sessions" },
+          { value: String(completedSessions.length), label: "Completed" },
+          { value: avgScore !== null ? `${avgScore}/10` : "—", label: "Avg score" },
+          { value: String(report.topMistakes.length), label: "Mistake patterns" },
+        ].map((stat) => (
           <Card key={stat.label} className="border-border/50">
             <CardContent className="p-5">
               <p className="text-3xl font-bold">{stat.value}</p>
@@ -134,15 +82,17 @@ function ReportDetailPage() {
         <Card className="border-border/50">
           <CardContent className="divide-y divide-border/50 p-0">
             {report.sessions.map((session) => (
-              <div
-                key={session.topic}
-                className="flex items-center justify-between px-5 py-3"
+              <Link
+                key={session.id}
+                to="/chats/$sessionId"
+                params={{ sessionId: session.id }}
+                className="flex items-center justify-between px-5 py-3 transition-colors hover:bg-accent/50"
               >
-                <span className="text-sm font-medium">{session.topic}</span>
+                <span className="text-sm font-medium">{session.topicTitle}</span>
                 <span className="text-sm text-muted-foreground">
-                  {session.score}
+                  {session.score !== null ? `Score: ${session.score}/10` : session.status}
                 </span>
-              </div>
+              </Link>
             ))}
           </CardContent>
         </Card>
@@ -152,31 +102,43 @@ function ReportDetailPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <section className="space-y-3">
           <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Common Mistakes
+            Mistake Patterns
           </h2>
           <Card className="border-border/50">
             <CardContent className="space-y-3 p-5">
-              {report.mistakes.map((item) => (
-                <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>&bull;</span>
-                  <span>{item}</span>
-                </div>
-              ))}
+              {report.topMistakes.length > 0 ? (
+                report.topMistakes.map((item) => (
+                  <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>&bull;</span>
+                    <span>{item}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Complete sessions to see mistake patterns here.
+                </p>
+              )}
             </CardContent>
           </Card>
         </section>
         <section className="space-y-3">
           <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Strengths
+            Grammar Focus
           </h2>
           <Card className="border-border/50">
             <CardContent className="space-y-3 p-5">
-              {report.strengths.map((item) => (
-                <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>&bull;</span>
-                  <span>{item}</span>
-                </div>
-              ))}
+              {report.topStrengths.length > 0 ? (
+                report.topStrengths.map((item) => (
+                  <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>&bull;</span>
+                    <span>{item}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Complete sessions to see grammar patterns here.
+                </p>
+              )}
             </CardContent>
           </Card>
         </section>

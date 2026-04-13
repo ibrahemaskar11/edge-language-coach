@@ -12,6 +12,7 @@ import { statsRoutes } from "./routes/stats.js";
 import { flashcardRoutes } from "./routes/flashcards.js";
 import { messageRoutes } from "./routes/messages.js";
 import { recommendationRoutes } from "./routes/recommendations.js";
+import { reportRoutes } from "./routes/reports.js";
 
 const app = Fastify({ logger: true });
 
@@ -31,6 +32,7 @@ await app.register(statsRoutes);
 await app.register(flashcardRoutes);
 await app.register(messageRoutes);
 await app.register(recommendationRoutes);
+await app.register(reportRoutes);
 
 app.get("/health", async () => ({ status: "ok" }));
 

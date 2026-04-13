@@ -98,3 +98,30 @@ export const endSession = (sessionId: string) =>
 
 // ─── Recommendations ──────────────────────────────────────
 export const fetchRecommendedTopics = () => apiFetch<Topic[]>("/recommendations");
+
+// ─── Reports ──────────────────────────────────────────────
+export interface WeekSummary {
+  weekId: string;
+  weekLabel: string;
+  sessionCount: number;
+  completedCount: number;
+}
+
+export interface ReportSession {
+  id: string;
+  topicTitle: string;
+  score: number | null;
+  status: string;
+  createdAt: string;
+}
+
+export interface ReportDetail {
+  weekId: string;
+  weekLabel: string;
+  sessions: ReportSession[];
+  topMistakes: string[];
+  topStrengths: string[];
+}
+
+export const fetchReports = () => apiFetch<WeekSummary[]>("/reports");
+export const fetchReport = (weekId: string) => apiFetch<ReportDetail>(`/reports/${weekId}`);

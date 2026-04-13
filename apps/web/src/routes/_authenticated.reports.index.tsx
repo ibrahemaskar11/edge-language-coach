@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useStats } from "@/hooks/use-api";
+import { Spinner } from "@/components/ui/spinner";
+import { useStats, useReports, useReport } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/_authenticated/reports/")({
   component: ReportsPage,
@@ -9,6 +10,11 @@ export const Route = createFileRoute("/_authenticated/reports/")({
 
 function ReportsPage() {
   const { data: stats } = useStats();
+  const { data: reports, isLoading: reportsLoading } = useReports();
+
+  // Fetch the most recent week's detail to show aggregated mistakes/strengths
+  const latestWeekId = reports?.[0]?.weekId ?? "";
+  const { data: latestDetail } = useReport(latestWeekId);
 
   return (
     <div className="space-y-10">
@@ -38,77 +44,84 @@ function ReportsPage() {
         </div>
       </section>
 
-      {/* Common Mistakes */}
-      <section className="space-y-3">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Common Mistakes
-        </h2>
-        <Card className="border-border/50">
-          <CardContent className="space-y-3 p-5">
-            {[
-              "Subjunctive mood — 8 occurrences",
-              "Article agreement — 5 occurrences",
-              'Preposition "di" vs "da" — 3 occurrences',
-            ].map((item) => (
-              <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>&bull;</span>
-                <span>{item}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </section>
+      {/* Common Mistakes — from most recent week */}
+      {latestDetail && latestDetail.topMistakes.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Recent Mistake Patterns
+          </h2>
+          <Card className="border-border/50">
+            <CardContent className="space-y-3 p-5">
+              {latestDetail.topMistakes.map((item) => (
+                <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>&bull;</span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
-      {/* Strengths */}
-      <section className="space-y-3">
-        <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Strengths
-        </h2>
-        <Card className="border-border/50">
-          <CardContent className="space-y-3 p-5">
-            {[
-              "Vocabulary range — above average",
-              "Pronunciation fluency — improving",
-              "Past tense usage — consistent",
-            ].map((item) => (
-              <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>&bull;</span>
-                <span>{item}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </section>
+      {/* Strengths — from most recent week */}
+      {latestDetail && latestDetail.topStrengths.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            Recent Strengths
+          </h2>
+          <Card className="border-border/50">
+            <CardContent className="space-y-3 p-5">
+              {latestDetail.topStrengths.map((item) => (
+                <div key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>&bull;</span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Past Reports */}
       <section className="space-y-3">
         <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Past Reports
         </h2>
-        <Card className="border-border/50">
-          <CardContent className="divide-y divide-border/50 p-0">
-            {[
-              { id: "mar-24", week: "Week of Mar 24", sessions: 5, accuracy: "78%" },
-              { id: "mar-17", week: "Week of Mar 17", sessions: 3, accuracy: "72%" },
-              { id: "mar-10", week: "Week of Mar 10", sessions: 4, accuracy: "75%" },
-            ].map((report) => (
-              <Link
-                key={report.id}
-                to="/reports/$reportId"
-                params={{ reportId: report.id }}
-                className="flex items-center justify-between px-5 py-3 transition-colors hover:bg-accent/50"
-              >
-                <span className="text-sm text-muted-foreground">
-                  {report.week} &middot; {report.sessions} sessions &middot;{" "}
-                  {report.accuracy} accuracy
-                </span>
-                <span className="shrink-0 text-sm text-muted-foreground">
-                  View <ArrowRight className="inline h-3 w-3" />
-                </span>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
+        {reportsLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Spinner className="h-5 w-5" />
+          </div>
+        ) : !reports || reports.length === 0 ? (
+          <Card className="border-border/50">
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">
+                No sessions yet. Complete a session to see your weekly reports.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-border/50">
+            <CardContent className="divide-y divide-border/50 p-0">
+              {reports.map((report) => (
+                <Link
+                  key={report.weekId}
+                  to="/reports/$reportId"
+                  params={{ reportId: report.weekId }}
+                  className="flex items-center justify-between px-5 py-3 transition-colors hover:bg-accent/50"
+                >
+                  <span className="text-sm text-muted-foreground">
+                    {report.weekLabel} &middot; {report.sessionCount}{" "}
+                    {report.sessionCount === 1 ? "session" : "sessions"} &middot;{" "}
+                    {report.completedCount} completed
+                  </span>
+                  <span className="shrink-0 text-sm text-muted-foreground">
+                    View <ArrowRight className="inline h-3 w-3" />
+                  </span>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </section>
     </div>
   );
