@@ -149,6 +149,23 @@ export function useRecommendedTopics() {
   });
 }
 
+// ─── Reports ─────────────────────────────────────────────
+export function useReports() {
+  return useQuery({
+    queryKey: ["reports"],
+    queryFn: api.fetchReports,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useReport(weekId: string) {
+  return useQuery({
+    queryKey: ["reports", weekId],
+    queryFn: () => api.fetchReport(weekId),
+    enabled: !!weekId,
+  });
+}
+
 export function useEndSession(sessionId: string) {
   const qc = useQueryClient();
   return useMutation({

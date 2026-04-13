@@ -12,6 +12,14 @@ function triggerFlashcardGeneration(fastify: FastifyInstance, sessionId: string,
   }).catch((err) => fastify.log.warn(`flashcard-generator unavailable: ${err}`));
 }
 
+function triggerSummaryGeneration(fastify: FastifyInstance, sessionId: string, userId: string) {
+  fetch(`${env.SUMMARY_GENERATOR_URL}/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId, userId }),
+  }).catch((err) => fastify.log.warn(`summary-generator unavailable: ${err}`));
+}
+
 const TOTAL_TURNS = 5;
 
 function buildSystemPrompt(topic: {
@@ -241,6 +249,7 @@ export async function messageRoutes(fastify: FastifyInstance) {
           .update({ status: "complete" })
           .eq("id", sessionId);
         triggerFlashcardGeneration(fastify, sessionId, request.userId);
+        triggerSummaryGeneration(fastify, sessionId, request.userId);
       }
 
       return reply.status(201).send(
@@ -320,6 +329,7 @@ export async function messageRoutes(fastify: FastifyInstance) {
 
       if (error) return reply.status(500).send({ message: error.message });
       triggerFlashcardGeneration(fastify, sessionId, request.userId);
+      triggerSummaryGeneration(fastify, sessionId, request.userId);
       return reply.send(toCamelCase(data));
     }
   );

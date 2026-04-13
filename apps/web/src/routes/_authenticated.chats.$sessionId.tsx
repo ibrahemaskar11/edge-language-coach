@@ -122,6 +122,42 @@ function ChatDetailPage() {
         </p>
       </div>
 
+      {/* Session Summary — shown for completed sessions that have a summary */}
+      {session.status === "complete" && (session as any).summary && (
+        <Card className="border-border/50 bg-accent/20">
+          <CardContent className="space-y-3 p-5">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Session Summary
+            </p>
+            <p className="text-sm">{(session as any).summary.overallNote}</p>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-bold">{(session as any).summary.score}</span>
+              <span className="text-sm text-muted-foreground">/10</span>
+              {(session as any).summary.encouragement && (
+                <span className="ml-3 text-sm text-muted-foreground italic">
+                  {(session as any).summary.encouragement}
+                </span>
+              )}
+            </div>
+            {(session as any).summary.keyVocabulary?.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs text-muted-foreground">Key vocabulary</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(session as any).summary.keyVocabulary.map((v: string) => (
+                    <span
+                      key={v}
+                      className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium"
+                    >
+                      {v}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Conversation with inline feedback */}
       {messages.length > 0 ? (
         <div className="space-y-4">

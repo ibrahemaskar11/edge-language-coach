@@ -244,11 +244,9 @@ export function SignupForm({
 function FieldError({
   field,
 }: {
-  field: { state: { meta: { isTouched: boolean; errors: string[] } } };
+  field: { state: { meta: { isTouched: boolean; errors: (string | undefined)[] } } };
 }) {
-  if (!field.state.meta.isTouched || field.state.meta.errors.length === 0)
-    return null;
-  return (
-    <p className="text-sm text-red-500">{field.state.meta.errors[0]}</p>
-  );
+  const errors = field.state.meta.errors.filter(Boolean) as string[];
+  if (!field.state.meta.isTouched || errors.length === 0) return null;
+  return <p className="text-sm text-red-500">{errors[0]}</p>;
 }

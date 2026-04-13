@@ -16,6 +16,7 @@ const envSchema = z.object({
   TOPIC_SCRAPER_URL: z.string().url().default("http://localhost:8080"),
   RECOMMENDATIONS_URL: z.string().url().default("http://localhost:8081"),
   FLASHCARD_GENERATOR_URL: z.string().url().default("http://localhost:8082"),
+  SUMMARY_GENERATOR_URL: z.string().url().default("http://localhost:8083"),
 });
 
 export const env = envSchema.parse(process.env);
