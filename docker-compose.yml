@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  topic-scraper:
+    build:
+      context: ./services/topic-scraper
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - PORT=8080
+    restart: unless-stopped
+
+  recommendations:
+    build:
+      context: ./services/recommendations
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - PORT=8081
+    restart: unless-stopped
+
+  flashcard-generator:
+    build:
+      context: ./services/flashcard-generator
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - PORT=8082
+    restart: unless-stopped

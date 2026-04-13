@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,12 @@ function FlashcardReviewPage() {
   const [revealed, setRevealed] = useState(false);
   const [completed, setCompleted] = useState(0);
 
+  // Snapshot cards on first load so the count stays stable during the session
+  const sessionCardsRef = useRef<NonNullable<typeof cards> | null>(null);
+  if (cards && sessionCardsRef.current === null) {
+    sessionCardsRef.current = cards;
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -28,7 +34,7 @@ function FlashcardReviewPage() {
     );
   }
 
-  const dueCards = cards ?? [];
+  const dueCards = sessionCardsRef.current ?? [];
   const totalDue = dueCards.length;
   const card = dueCards[currentIndex];
   const isDone = completed >= totalDue || !card;

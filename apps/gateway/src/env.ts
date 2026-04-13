@@ -13,6 +13,9 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   SUPABASE_JWT_SECRET: z.string().min(1).optional(),
   GROQ_API_KEY: z.string().min(1).optional(),
+  TOPIC_SCRAPER_URL: z.string().url().default("http://localhost:8080"),
+  RECOMMENDATIONS_URL: z.string().url().default("http://localhost:8081"),
+  FLASHCARD_GENERATOR_URL: z.string().url().default("http://localhost:8082"),
 });
 
 export const env = envSchema.parse(process.env);

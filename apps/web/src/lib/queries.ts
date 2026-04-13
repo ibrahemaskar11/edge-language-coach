@@ -95,3 +95,6 @@ export const sendMessage = (sessionId: string, body: SendMessageInput) =>
 
 export const endSession = (sessionId: string) =>
   apiFetch<Session>(`/sessions/${sessionId}/end`, { method: "POST" });
+
+// ─── Recommendations ──────────────────────────────────────
+export const fetchRecommendedTopics = () => apiFetch<Topic[]>("/recommendations");

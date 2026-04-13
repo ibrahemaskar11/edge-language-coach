@@ -3,14 +3,17 @@ import { useState, useMemo } from "react";
 import { ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { useTopics } from "@/hooks/use-api";
+import { useTopics, useRecommendedTopics } from "@/hooks/use-api";
 
 export const Route = createFileRoute("/_authenticated/topics/")({
   component: TopicsPage,
 });
 
 function TopicsPage() {
-  const { data: topics, isLoading } = useTopics();
+  const { data: topics, isLoading: topicsLoading } = useTopics();
+  const { data: recommendedTopics, isLoading: recLoading } = useRecommendedTopics();
+  const isLoading = topicsLoading || recLoading;
+  const [isRecommended, setIsRecommended] = useState(true);
   const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
 
   const categories = useMemo(() => {
@@ -18,14 +21,26 @@ function TopicsPage() {
     return [...new Set(topics.map((t) => t.category))].sort();
   }, [topics]);
 
-  // Empty set = no filter = show all
   const filteredTopics = useMemo(() => {
     if (!topics) return [];
-    if (activeCategories.size === 0) return topics;
+
+    if (isRecommended) {
+      return recommendedTopics ?? [];
+    }
+
+    if (activeCategories.size === 0) {
+      // Default: recommended first, then the rest
+      if (!recommendedTopics || recommendedTopics.length === 0) return topics;
+      const recIds = new Set(recommendedTopics.map((t) => t.id));
+      const rest = topics.filter((t) => !recIds.has(t.id));
+      return [...recommendedTopics, ...rest];
+    }
+
     return topics.filter((t) => activeCategories.has(t.category));
-  }, [topics, activeCategories]);
+  }, [topics, recommendedTopics, isRecommended, activeCategories]);
 
   function toggleCategory(cat: string) {
+    setIsRecommended(false);
     const next = new Set(activeCategories);
     if (next.has(cat)) {
       next.delete(cat);
@@ -33,6 +48,11 @@ function TopicsPage() {
       next.add(cat);
     }
     setActiveCategories(next);
+  }
+
+  function handleRecommendedClick() {
+    setIsRecommended((prev) => !prev);
+    setActiveCategories(new Set());
   }
 
   if (isLoading) {
@@ -50,24 +70,34 @@ function TopicsPage() {
         <p className="mt-1 text-muted-foreground">Choose a topic to practice</p>
       </div>
 
-      {/* Category filters */}
-      {categories.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => toggleCategory(cat)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
-                activeCategories.has(cat)
-                  ? "border-foreground/20 bg-foreground text-background"
-                  : "border-border/50 text-muted-foreground hover:border-border"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Filter chips */}
+      <div className="flex flex-wrap gap-2">
+        {/* Recommended chip — always first */}
+        <button
+          onClick={handleRecommendedClick}
+          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+            isRecommended
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border/50 text-muted-foreground hover:border-border"
+          }`}
+        >
+          ✦ Recommended
+        </button>
+
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => toggleCategory(cat)}
+            className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
+              activeCategories.has(cat)
+                ? "border-foreground/20 bg-foreground text-background"
+                : "border-border/50 text-muted-foreground hover:border-border"
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
 
       {!filteredTopics.length ? (
         <p className="text-sm text-muted-foreground">No topics match the selected filters.</p>

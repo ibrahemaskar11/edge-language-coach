@@ -2,6 +2,15 @@ import type { FastifyInstance } from "fastify";
 import { sendMessageSchema, llmCoachResponseSchema } from "@edge/shared";
 import { ZodError } from "zod";
 import { toCamelCase } from "../utils/camelcase.js";
+import { env } from "../env.js";
+
+function triggerFlashcardGeneration(fastify: FastifyInstance, sessionId: string, userId: string) {
+  fetch(`${env.FLASHCARD_GENERATOR_URL}/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId, userId }),
+  }).catch((err) => fastify.log.warn(`flashcard-generator unavailable: ${err}`));
+}
 
 const TOTAL_TURNS = 5;
 
@@ -231,6 +240,7 @@ export async function messageRoutes(fastify: FastifyInstance) {
           .from("sessions")
           .update({ status: "complete" })
           .eq("id", sessionId);
+        triggerFlashcardGeneration(fastify, sessionId, request.userId);
       }
 
       return reply.status(201).send(
@@ -309,6 +319,7 @@ export async function messageRoutes(fastify: FastifyInstance) {
         .single();
 
       if (error) return reply.status(500).send({ message: error.message });
+      triggerFlashcardGeneration(fastify, sessionId, request.userId);
       return reply.send(toCamelCase(data));
     }
   );
