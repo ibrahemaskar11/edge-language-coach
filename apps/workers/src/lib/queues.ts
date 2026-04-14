@@ -6,6 +6,6 @@ export const connection = new Redis(
   { maxRetriesPerRequest: null } // required by BullMQ
 );
 
-export const flashcardQueue = new Queue("flashcard:generate", { connection });
-export const summaryQueue   = new Queue("summary:generate",   { connection });
-export const scraperQueue   = new Queue("topic:scrape",       { connection });
+export const flashcardQueue = new Queue("flashcard-generate", { connection });
+export const summaryQueue   = new Queue("summary-generate",   { connection });
+export const scraperQueue   = new Queue("topic-scrape",       { connection });

@@ -13,7 +13,7 @@ export function createScraperWorker() {
   scraperQueue.add("startup", {}, { priority: 1 });
 
   return new Worker(
-    "topic:scrape",
+    "topic-scrape",
     async () => { await runScraper(); },
     { connection, concurrency: 1 } // never run two scrapers concurrently
   );

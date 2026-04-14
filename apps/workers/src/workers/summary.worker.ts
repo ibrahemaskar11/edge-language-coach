@@ -4,7 +4,7 @@ import { runSummaryGeneration } from "../jobs/summary.job.js";
 
 export function createSummaryWorker() {
   return new Worker(
-    "summary:generate",
+    "summary-generate",
     async (job) => {
       const { sessionId, userId } = job.data as { sessionId: string; userId: string };
       await runSummaryGeneration(sessionId, userId);

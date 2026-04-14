@@ -4,5 +4,5 @@ import { env } from "../env.js";
 
 const connection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
 
-export const flashcardQueue = new Queue("flashcard:generate", { connection });
-export const summaryQueue = new Queue("summary:generate", { connection });
+export const flashcardQueue = new Queue("flashcard-generate", { connection });
+export const summaryQueue = new Queue("summary-generate", { connection });

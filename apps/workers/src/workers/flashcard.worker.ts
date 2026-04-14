@@ -4,7 +4,7 @@ import { runFlashcardGeneration } from "../jobs/flashcard.job.js";
 
 export function createFlashcardWorker() {
   return new Worker(
-    "flashcard:generate",
+    "flashcard-generate",
     async (job) => {
       const { sessionId, userId } = job.data as { sessionId: string; userId: string };
       await runFlashcardGeneration(sessionId, userId);
