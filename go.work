@@ -1,8 +1,0 @@
-go 1.23
-
-use (
-	./services/flashcard-generator
-	./services/recommendations
-	./services/summary-generator
-	./services/topic-scraper
-)
