@@ -2,22 +2,28 @@ import type { FastifyInstance } from "fastify";
 import { sendMessageSchema, llmCoachResponseSchema } from "@edge/shared";
 import { ZodError } from "zod";
 import { toCamelCase } from "../utils/camelcase.js";
-import { env } from "../env.js";
+import { flashcardQueue, summaryQueue } from "../lib/queues.js";
 
-function triggerFlashcardGeneration(fastify: FastifyInstance, sessionId: string, userId: string) {
-  fetch(`${env.FLASHCARD_GENERATOR_URL}/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sessionId, userId }),
-  }).catch((err) => fastify.log.warn(`flashcard-generator unavailable: ${err}`));
+async function enqueueFlashcardGeneration(fastify: FastifyInstance, sessionId: string, userId: string) {
+  try {
+    await flashcardQueue.add("generate", { sessionId, userId }, {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 5000 },
+    });
+  } catch (err) {
+    fastify.log.warn(`failed to enqueue flashcard generation: ${err}`);
+  }
 }
 
-function triggerSummaryGeneration(fastify: FastifyInstance, sessionId: string, userId: string) {
-  fetch(`${env.SUMMARY_GENERATOR_URL}/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sessionId, userId }),
-  }).catch((err) => fastify.log.warn(`summary-generator unavailable: ${err}`));
+async function enqueueSummaryGeneration(fastify: FastifyInstance, sessionId: string, userId: string) {
+  try {
+    await summaryQueue.add("generate", { sessionId, userId }, {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 5000 },
+    });
+  } catch (err) {
+    fastify.log.warn(`failed to enqueue summary generation: ${err}`);
+  }
 }
 
 const TOTAL_TURNS = 5;
@@ -248,8 +254,8 @@ export async function messageRoutes(fastify: FastifyInstance) {
           .from("sessions")
           .update({ status: "complete" })
           .eq("id", sessionId);
-        triggerFlashcardGeneration(fastify, sessionId, request.userId);
-        triggerSummaryGeneration(fastify, sessionId, request.userId);
+        await enqueueFlashcardGeneration(fastify, sessionId, request.userId);
+        await enqueueSummaryGeneration(fastify, sessionId, request.userId);
       }
 
       return reply.status(201).send(
@@ -328,8 +334,8 @@ export async function messageRoutes(fastify: FastifyInstance) {
         .single();
 
       if (error) return reply.status(500).send({ message: error.message });
-      triggerFlashcardGeneration(fastify, sessionId, request.userId);
-      triggerSummaryGeneration(fastify, sessionId, request.userId);
+      await enqueueFlashcardGeneration(fastify, sessionId, request.userId);
+      await enqueueSummaryGeneration(fastify, sessionId, request.userId);
       return reply.send(toCamelCase(data));
     }
   );
