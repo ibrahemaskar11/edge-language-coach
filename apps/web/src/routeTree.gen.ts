@@ -12,20 +12,23 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
-import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated.index'
-import { Route as AuthenticatedTopicsRouteImport } from './routes/_authenticated.topics'
-import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated.reports'
-import { Route as AuthenticatedFlashcardsRouteImport } from './routes/_authenticated.flashcards'
-import { Route as AuthenticatedChatsRouteImport } from './routes/_authenticated.chats'
-import { Route as AuthenticatedTopicsIndexRouteImport } from './routes/_authenticated.topics.index'
-import { Route as AuthenticatedReportsIndexRouteImport } from './routes/_authenticated.reports.index'
-import { Route as AuthenticatedFlashcardsIndexRouteImport } from './routes/_authenticated.flashcards.index'
-import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated.chats.index'
-import { Route as AuthenticatedTopicsTopicIdRouteImport } from './routes/_authenticated.topics.$topicId'
-import { Route as AuthenticatedSessionTopicIdRouteImport } from './routes/_authenticated.session.$topicId'
-import { Route as AuthenticatedReportsReportIdRouteImport } from './routes/_authenticated.reports.$reportId'
-import { Route as AuthenticatedFlashcardsTopicIdRouteImport } from './routes/_authenticated.flashcards.$topicId'
-import { Route as AuthenticatedChatsSessionIdRouteImport } from './routes/_authenticated.chats.$sessionId'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedPlaygroundRouteImport } from './routes/_authenticated.playground'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated.onboarding'
+import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_authenticated.playground.index'
+import { Route as AuthenticatedPlaygroundTopicsRouteImport } from './routes/_authenticated.playground.topics'
+import { Route as AuthenticatedPlaygroundReportsRouteImport } from './routes/_authenticated.playground.reports'
+import { Route as AuthenticatedPlaygroundFlashcardsRouteImport } from './routes/_authenticated.playground.flashcards'
+import { Route as AuthenticatedPlaygroundChatsRouteImport } from './routes/_authenticated.playground.chats'
+import { Route as AuthenticatedPlaygroundTopicsIndexRouteImport } from './routes/_authenticated.playground.topics.index'
+import { Route as AuthenticatedPlaygroundReportsIndexRouteImport } from './routes/_authenticated.playground.reports.index'
+import { Route as AuthenticatedPlaygroundFlashcardsIndexRouteImport } from './routes/_authenticated.playground.flashcards.index'
+import { Route as AuthenticatedPlaygroundChatsIndexRouteImport } from './routes/_authenticated.playground.chats.index'
+import { Route as AuthenticatedPlaygroundTopicsTopicIdRouteImport } from './routes/_authenticated.playground.topics.$topicId'
+import { Route as AuthenticatedPlaygroundSessionTopicIdRouteImport } from './routes/_authenticated.playground.session.$topicId'
+import { Route as AuthenticatedPlaygroundReportsReportIdRouteImport } from './routes/_authenticated.playground.reports.$reportId'
+import { Route as AuthenticatedPlaygroundFlashcardsTopicIdRouteImport } from './routes/_authenticated.playground.flashcards.$topicId'
+import { Route as AuthenticatedPlaygroundChatsSessionIdRouteImport } from './routes/_authenticated.playground.chats.$sessionId'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -41,136 +44,165 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
+const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedPlaygroundRoute = AuthenticatedPlaygroundRouteImport.update({
+  id: '/playground',
+  path: '/playground',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedTopicsRoute = AuthenticatedTopicsRouteImport.update({
-  id: '/topics',
-  path: '/topics',
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedFlashcardsRoute = AuthenticatedFlashcardsRouteImport.update({
-  id: '/flashcards',
-  path: '/flashcards',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedChatsRoute = AuthenticatedChatsRouteImport.update({
-  id: '/chats',
-  path: '/chats',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedTopicsIndexRoute =
-  AuthenticatedTopicsIndexRouteImport.update({
+const AuthenticatedPlaygroundIndexRoute =
+  AuthenticatedPlaygroundIndexRouteImport.update({
     id: '/',
     path: '/',
-    getParentRoute: () => AuthenticatedTopicsRoute,
+    getParentRoute: () => AuthenticatedPlaygroundRoute,
   } as any)
-const AuthenticatedReportsIndexRoute =
-  AuthenticatedReportsIndexRouteImport.update({
+const AuthenticatedPlaygroundTopicsRoute =
+  AuthenticatedPlaygroundTopicsRouteImport.update({
+    id: '/topics',
+    path: '/topics',
+    getParentRoute: () => AuthenticatedPlaygroundRoute,
+  } as any)
+const AuthenticatedPlaygroundReportsRoute =
+  AuthenticatedPlaygroundReportsRouteImport.update({
+    id: '/reports',
+    path: '/reports',
+    getParentRoute: () => AuthenticatedPlaygroundRoute,
+  } as any)
+const AuthenticatedPlaygroundFlashcardsRoute =
+  AuthenticatedPlaygroundFlashcardsRouteImport.update({
+    id: '/flashcards',
+    path: '/flashcards',
+    getParentRoute: () => AuthenticatedPlaygroundRoute,
+  } as any)
+const AuthenticatedPlaygroundChatsRoute =
+  AuthenticatedPlaygroundChatsRouteImport.update({
+    id: '/chats',
+    path: '/chats',
+    getParentRoute: () => AuthenticatedPlaygroundRoute,
+  } as any)
+const AuthenticatedPlaygroundTopicsIndexRoute =
+  AuthenticatedPlaygroundTopicsIndexRouteImport.update({
     id: '/',
     path: '/',
-    getParentRoute: () => AuthenticatedReportsRoute,
+    getParentRoute: () => AuthenticatedPlaygroundTopicsRoute,
   } as any)
-const AuthenticatedFlashcardsIndexRoute =
-  AuthenticatedFlashcardsIndexRouteImport.update({
+const AuthenticatedPlaygroundReportsIndexRoute =
+  AuthenticatedPlaygroundReportsIndexRouteImport.update({
     id: '/',
     path: '/',
-    getParentRoute: () => AuthenticatedFlashcardsRoute,
+    getParentRoute: () => AuthenticatedPlaygroundReportsRoute,
   } as any)
-const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AuthenticatedChatsRoute,
-} as any)
-const AuthenticatedTopicsTopicIdRoute =
-  AuthenticatedTopicsTopicIdRouteImport.update({
+const AuthenticatedPlaygroundFlashcardsIndexRoute =
+  AuthenticatedPlaygroundFlashcardsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedPlaygroundFlashcardsRoute,
+  } as any)
+const AuthenticatedPlaygroundChatsIndexRoute =
+  AuthenticatedPlaygroundChatsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedPlaygroundChatsRoute,
+  } as any)
+const AuthenticatedPlaygroundTopicsTopicIdRoute =
+  AuthenticatedPlaygroundTopicsTopicIdRouteImport.update({
     id: '/$topicId',
     path: '/$topicId',
-    getParentRoute: () => AuthenticatedTopicsRoute,
+    getParentRoute: () => AuthenticatedPlaygroundTopicsRoute,
   } as any)
-const AuthenticatedSessionTopicIdRoute =
-  AuthenticatedSessionTopicIdRouteImport.update({
+const AuthenticatedPlaygroundSessionTopicIdRoute =
+  AuthenticatedPlaygroundSessionTopicIdRouteImport.update({
     id: '/session/$topicId',
     path: '/session/$topicId',
-    getParentRoute: () => AuthenticatedRoute,
+    getParentRoute: () => AuthenticatedPlaygroundRoute,
   } as any)
-const AuthenticatedReportsReportIdRoute =
-  AuthenticatedReportsReportIdRouteImport.update({
+const AuthenticatedPlaygroundReportsReportIdRoute =
+  AuthenticatedPlaygroundReportsReportIdRouteImport.update({
     id: '/$reportId',
     path: '/$reportId',
-    getParentRoute: () => AuthenticatedReportsRoute,
+    getParentRoute: () => AuthenticatedPlaygroundReportsRoute,
   } as any)
-const AuthenticatedFlashcardsTopicIdRoute =
-  AuthenticatedFlashcardsTopicIdRouteImport.update({
+const AuthenticatedPlaygroundFlashcardsTopicIdRoute =
+  AuthenticatedPlaygroundFlashcardsTopicIdRouteImport.update({
     id: '/$topicId',
     path: '/$topicId',
-    getParentRoute: () => AuthenticatedFlashcardsRoute,
+    getParentRoute: () => AuthenticatedPlaygroundFlashcardsRoute,
   } as any)
-const AuthenticatedChatsSessionIdRoute =
-  AuthenticatedChatsSessionIdRouteImport.update({
+const AuthenticatedPlaygroundChatsSessionIdRoute =
+  AuthenticatedPlaygroundChatsSessionIdRouteImport.update({
     id: '/$sessionId',
     path: '/$sessionId',
-    getParentRoute: () => AuthenticatedChatsRoute,
+    getParentRoute: () => AuthenticatedPlaygroundChatsRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AuthenticatedIndexRoute
+  '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/chats': typeof AuthenticatedChatsRouteWithChildren
-  '/flashcards': typeof AuthenticatedFlashcardsRouteWithChildren
-  '/reports': typeof AuthenticatedReportsRouteWithChildren
-  '/topics': typeof AuthenticatedTopicsRouteWithChildren
-  '/chats/$sessionId': typeof AuthenticatedChatsSessionIdRoute
-  '/flashcards/$topicId': typeof AuthenticatedFlashcardsTopicIdRoute
-  '/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
-  '/session/$topicId': typeof AuthenticatedSessionTopicIdRoute
-  '/topics/$topicId': typeof AuthenticatedTopicsTopicIdRoute
-  '/chats/': typeof AuthenticatedChatsIndexRoute
-  '/flashcards/': typeof AuthenticatedFlashcardsIndexRoute
-  '/reports/': typeof AuthenticatedReportsIndexRoute
-  '/topics/': typeof AuthenticatedTopicsIndexRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/playground': typeof AuthenticatedPlaygroundRouteWithChildren
+  '/playground/chats': typeof AuthenticatedPlaygroundChatsRouteWithChildren
+  '/playground/flashcards': typeof AuthenticatedPlaygroundFlashcardsRouteWithChildren
+  '/playground/reports': typeof AuthenticatedPlaygroundReportsRouteWithChildren
+  '/playground/topics': typeof AuthenticatedPlaygroundTopicsRouteWithChildren
+  '/playground/': typeof AuthenticatedPlaygroundIndexRoute
+  '/playground/chats/$sessionId': typeof AuthenticatedPlaygroundChatsSessionIdRoute
+  '/playground/flashcards/$topicId': typeof AuthenticatedPlaygroundFlashcardsTopicIdRoute
+  '/playground/reports/$reportId': typeof AuthenticatedPlaygroundReportsReportIdRoute
+  '/playground/session/$topicId': typeof AuthenticatedPlaygroundSessionTopicIdRoute
+  '/playground/topics/$topicId': typeof AuthenticatedPlaygroundTopicsTopicIdRoute
+  '/playground/chats/': typeof AuthenticatedPlaygroundChatsIndexRoute
+  '/playground/flashcards/': typeof AuthenticatedPlaygroundFlashcardsIndexRoute
+  '/playground/reports/': typeof AuthenticatedPlaygroundReportsIndexRoute
+  '/playground/topics/': typeof AuthenticatedPlaygroundTopicsIndexRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/': typeof AuthenticatedIndexRoute
-  '/chats/$sessionId': typeof AuthenticatedChatsSessionIdRoute
-  '/flashcards/$topicId': typeof AuthenticatedFlashcardsTopicIdRoute
-  '/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
-  '/session/$topicId': typeof AuthenticatedSessionTopicIdRoute
-  '/topics/$topicId': typeof AuthenticatedTopicsTopicIdRoute
-  '/chats': typeof AuthenticatedChatsIndexRoute
-  '/flashcards': typeof AuthenticatedFlashcardsIndexRoute
-  '/reports': typeof AuthenticatedReportsIndexRoute
-  '/topics': typeof AuthenticatedTopicsIndexRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/playground': typeof AuthenticatedPlaygroundIndexRoute
+  '/playground/chats/$sessionId': typeof AuthenticatedPlaygroundChatsSessionIdRoute
+  '/playground/flashcards/$topicId': typeof AuthenticatedPlaygroundFlashcardsTopicIdRoute
+  '/playground/reports/$reportId': typeof AuthenticatedPlaygroundReportsReportIdRoute
+  '/playground/session/$topicId': typeof AuthenticatedPlaygroundSessionTopicIdRoute
+  '/playground/topics/$topicId': typeof AuthenticatedPlaygroundTopicsTopicIdRoute
+  '/playground/chats': typeof AuthenticatedPlaygroundChatsIndexRoute
+  '/playground/flashcards': typeof AuthenticatedPlaygroundFlashcardsIndexRoute
+  '/playground/reports': typeof AuthenticatedPlaygroundReportsIndexRoute
+  '/playground/topics': typeof AuthenticatedPlaygroundTopicsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/_authenticated/chats': typeof AuthenticatedChatsRouteWithChildren
-  '/_authenticated/flashcards': typeof AuthenticatedFlashcardsRouteWithChildren
-  '/_authenticated/reports': typeof AuthenticatedReportsRouteWithChildren
-  '/_authenticated/topics': typeof AuthenticatedTopicsRouteWithChildren
-  '/_authenticated/': typeof AuthenticatedIndexRoute
-  '/_authenticated/chats/$sessionId': typeof AuthenticatedChatsSessionIdRoute
-  '/_authenticated/flashcards/$topicId': typeof AuthenticatedFlashcardsTopicIdRoute
-  '/_authenticated/reports/$reportId': typeof AuthenticatedReportsReportIdRoute
-  '/_authenticated/session/$topicId': typeof AuthenticatedSessionTopicIdRoute
-  '/_authenticated/topics/$topicId': typeof AuthenticatedTopicsTopicIdRoute
-  '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
-  '/_authenticated/flashcards/': typeof AuthenticatedFlashcardsIndexRoute
-  '/_authenticated/reports/': typeof AuthenticatedReportsIndexRoute
-  '/_authenticated/topics/': typeof AuthenticatedTopicsIndexRoute
+  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/playground': typeof AuthenticatedPlaygroundRouteWithChildren
+  '/_authenticated/playground/chats': typeof AuthenticatedPlaygroundChatsRouteWithChildren
+  '/_authenticated/playground/flashcards': typeof AuthenticatedPlaygroundFlashcardsRouteWithChildren
+  '/_authenticated/playground/reports': typeof AuthenticatedPlaygroundReportsRouteWithChildren
+  '/_authenticated/playground/topics': typeof AuthenticatedPlaygroundTopicsRouteWithChildren
+  '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
+  '/_authenticated/playground/chats/$sessionId': typeof AuthenticatedPlaygroundChatsSessionIdRoute
+  '/_authenticated/playground/flashcards/$topicId': typeof AuthenticatedPlaygroundFlashcardsTopicIdRoute
+  '/_authenticated/playground/reports/$reportId': typeof AuthenticatedPlaygroundReportsReportIdRoute
+  '/_authenticated/playground/session/$topicId': typeof AuthenticatedPlaygroundSessionTopicIdRoute
+  '/_authenticated/playground/topics/$topicId': typeof AuthenticatedPlaygroundTopicsTopicIdRoute
+  '/_authenticated/playground/chats/': typeof AuthenticatedPlaygroundChatsIndexRoute
+  '/_authenticated/playground/flashcards/': typeof AuthenticatedPlaygroundFlashcardsIndexRoute
+  '/_authenticated/playground/reports/': typeof AuthenticatedPlaygroundReportsIndexRoute
+  '/_authenticated/playground/topics/': typeof AuthenticatedPlaygroundTopicsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -178,55 +210,64 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/register'
-    | '/chats'
-    | '/flashcards'
-    | '/reports'
-    | '/topics'
-    | '/chats/$sessionId'
-    | '/flashcards/$topicId'
-    | '/reports/$reportId'
-    | '/session/$topicId'
-    | '/topics/$topicId'
-    | '/chats/'
-    | '/flashcards/'
-    | '/reports/'
-    | '/topics/'
+    | '/onboarding'
+    | '/playground'
+    | '/playground/chats'
+    | '/playground/flashcards'
+    | '/playground/reports'
+    | '/playground/topics'
+    | '/playground/'
+    | '/playground/chats/$sessionId'
+    | '/playground/flashcards/$topicId'
+    | '/playground/reports/$reportId'
+    | '/playground/session/$topicId'
+    | '/playground/topics/$topicId'
+    | '/playground/chats/'
+    | '/playground/flashcards/'
+    | '/playground/reports/'
+    | '/playground/topics/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/login'
     | '/register'
-    | '/'
-    | '/chats/$sessionId'
-    | '/flashcards/$topicId'
-    | '/reports/$reportId'
-    | '/session/$topicId'
-    | '/topics/$topicId'
-    | '/chats'
-    | '/flashcards'
-    | '/reports'
-    | '/topics'
+    | '/onboarding'
+    | '/playground'
+    | '/playground/chats/$sessionId'
+    | '/playground/flashcards/$topicId'
+    | '/playground/reports/$reportId'
+    | '/playground/session/$topicId'
+    | '/playground/topics/$topicId'
+    | '/playground/chats'
+    | '/playground/flashcards'
+    | '/playground/reports'
+    | '/playground/topics'
   id:
     | '__root__'
+    | '/'
     | '/_authenticated'
     | '/login'
     | '/register'
-    | '/_authenticated/chats'
-    | '/_authenticated/flashcards'
-    | '/_authenticated/reports'
-    | '/_authenticated/topics'
-    | '/_authenticated/'
-    | '/_authenticated/chats/$sessionId'
-    | '/_authenticated/flashcards/$topicId'
-    | '/_authenticated/reports/$reportId'
-    | '/_authenticated/session/$topicId'
-    | '/_authenticated/topics/$topicId'
-    | '/_authenticated/chats/'
-    | '/_authenticated/flashcards/'
-    | '/_authenticated/reports/'
-    | '/_authenticated/topics/'
+    | '/_authenticated/onboarding'
+    | '/_authenticated/playground'
+    | '/_authenticated/playground/chats'
+    | '/_authenticated/playground/flashcards'
+    | '/_authenticated/playground/reports'
+    | '/_authenticated/playground/topics'
+    | '/_authenticated/playground/'
+    | '/_authenticated/playground/chats/$sessionId'
+    | '/_authenticated/playground/flashcards/$topicId'
+    | '/_authenticated/playground/reports/$reportId'
+    | '/_authenticated/playground/session/$topicId'
+    | '/_authenticated/playground/topics/$topicId'
+    | '/_authenticated/playground/chats/'
+    | '/_authenticated/playground/flashcards/'
+    | '/_authenticated/playground/reports/'
+    | '/_authenticated/playground/topics/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
@@ -255,178 +296,237 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/': {
-      id: '/_authenticated/'
+    '/': {
+      id: '/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/playground': {
+      id: '/_authenticated/playground'
+      path: '/playground'
+      fullPath: '/playground'
+      preLoaderRoute: typeof AuthenticatedPlaygroundRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/topics': {
-      id: '/_authenticated/topics'
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/playground/': {
+      id: '/_authenticated/playground/'
+      path: '/'
+      fullPath: '/playground/'
+      preLoaderRoute: typeof AuthenticatedPlaygroundIndexRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundRoute
+    }
+    '/_authenticated/playground/topics': {
+      id: '/_authenticated/playground/topics'
       path: '/topics'
-      fullPath: '/topics'
-      preLoaderRoute: typeof AuthenticatedTopicsRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      fullPath: '/playground/topics'
+      preLoaderRoute: typeof AuthenticatedPlaygroundTopicsRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundRoute
     }
-    '/_authenticated/reports': {
-      id: '/_authenticated/reports'
+    '/_authenticated/playground/reports': {
+      id: '/_authenticated/playground/reports'
       path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof AuthenticatedReportsRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      fullPath: '/playground/reports'
+      preLoaderRoute: typeof AuthenticatedPlaygroundReportsRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundRoute
     }
-    '/_authenticated/flashcards': {
-      id: '/_authenticated/flashcards'
+    '/_authenticated/playground/flashcards': {
+      id: '/_authenticated/playground/flashcards'
       path: '/flashcards'
-      fullPath: '/flashcards'
-      preLoaderRoute: typeof AuthenticatedFlashcardsRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      fullPath: '/playground/flashcards'
+      preLoaderRoute: typeof AuthenticatedPlaygroundFlashcardsRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundRoute
     }
-    '/_authenticated/chats': {
-      id: '/_authenticated/chats'
+    '/_authenticated/playground/chats': {
+      id: '/_authenticated/playground/chats'
       path: '/chats'
-      fullPath: '/chats'
-      preLoaderRoute: typeof AuthenticatedChatsRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      fullPath: '/playground/chats'
+      preLoaderRoute: typeof AuthenticatedPlaygroundChatsRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundRoute
     }
-    '/_authenticated/topics/': {
-      id: '/_authenticated/topics/'
+    '/_authenticated/playground/topics/': {
+      id: '/_authenticated/playground/topics/'
       path: '/'
-      fullPath: '/topics/'
-      preLoaderRoute: typeof AuthenticatedTopicsIndexRouteImport
-      parentRoute: typeof AuthenticatedTopicsRoute
+      fullPath: '/playground/topics/'
+      preLoaderRoute: typeof AuthenticatedPlaygroundTopicsIndexRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundTopicsRoute
     }
-    '/_authenticated/reports/': {
-      id: '/_authenticated/reports/'
+    '/_authenticated/playground/reports/': {
+      id: '/_authenticated/playground/reports/'
       path: '/'
-      fullPath: '/reports/'
-      preLoaderRoute: typeof AuthenticatedReportsIndexRouteImport
-      parentRoute: typeof AuthenticatedReportsRoute
+      fullPath: '/playground/reports/'
+      preLoaderRoute: typeof AuthenticatedPlaygroundReportsIndexRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundReportsRoute
     }
-    '/_authenticated/flashcards/': {
-      id: '/_authenticated/flashcards/'
+    '/_authenticated/playground/flashcards/': {
+      id: '/_authenticated/playground/flashcards/'
       path: '/'
-      fullPath: '/flashcards/'
-      preLoaderRoute: typeof AuthenticatedFlashcardsIndexRouteImport
-      parentRoute: typeof AuthenticatedFlashcardsRoute
+      fullPath: '/playground/flashcards/'
+      preLoaderRoute: typeof AuthenticatedPlaygroundFlashcardsIndexRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundFlashcardsRoute
     }
-    '/_authenticated/chats/': {
-      id: '/_authenticated/chats/'
+    '/_authenticated/playground/chats/': {
+      id: '/_authenticated/playground/chats/'
       path: '/'
-      fullPath: '/chats/'
-      preLoaderRoute: typeof AuthenticatedChatsIndexRouteImport
-      parentRoute: typeof AuthenticatedChatsRoute
+      fullPath: '/playground/chats/'
+      preLoaderRoute: typeof AuthenticatedPlaygroundChatsIndexRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundChatsRoute
     }
-    '/_authenticated/topics/$topicId': {
-      id: '/_authenticated/topics/$topicId'
+    '/_authenticated/playground/topics/$topicId': {
+      id: '/_authenticated/playground/topics/$topicId'
       path: '/$topicId'
-      fullPath: '/topics/$topicId'
-      preLoaderRoute: typeof AuthenticatedTopicsTopicIdRouteImport
-      parentRoute: typeof AuthenticatedTopicsRoute
+      fullPath: '/playground/topics/$topicId'
+      preLoaderRoute: typeof AuthenticatedPlaygroundTopicsTopicIdRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundTopicsRoute
     }
-    '/_authenticated/session/$topicId': {
-      id: '/_authenticated/session/$topicId'
+    '/_authenticated/playground/session/$topicId': {
+      id: '/_authenticated/playground/session/$topicId'
       path: '/session/$topicId'
-      fullPath: '/session/$topicId'
-      preLoaderRoute: typeof AuthenticatedSessionTopicIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
+      fullPath: '/playground/session/$topicId'
+      preLoaderRoute: typeof AuthenticatedPlaygroundSessionTopicIdRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundRoute
     }
-    '/_authenticated/reports/$reportId': {
-      id: '/_authenticated/reports/$reportId'
+    '/_authenticated/playground/reports/$reportId': {
+      id: '/_authenticated/playground/reports/$reportId'
       path: '/$reportId'
-      fullPath: '/reports/$reportId'
-      preLoaderRoute: typeof AuthenticatedReportsReportIdRouteImport
-      parentRoute: typeof AuthenticatedReportsRoute
+      fullPath: '/playground/reports/$reportId'
+      preLoaderRoute: typeof AuthenticatedPlaygroundReportsReportIdRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundReportsRoute
     }
-    '/_authenticated/flashcards/$topicId': {
-      id: '/_authenticated/flashcards/$topicId'
+    '/_authenticated/playground/flashcards/$topicId': {
+      id: '/_authenticated/playground/flashcards/$topicId'
       path: '/$topicId'
-      fullPath: '/flashcards/$topicId'
-      preLoaderRoute: typeof AuthenticatedFlashcardsTopicIdRouteImport
-      parentRoute: typeof AuthenticatedFlashcardsRoute
+      fullPath: '/playground/flashcards/$topicId'
+      preLoaderRoute: typeof AuthenticatedPlaygroundFlashcardsTopicIdRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundFlashcardsRoute
     }
-    '/_authenticated/chats/$sessionId': {
-      id: '/_authenticated/chats/$sessionId'
+    '/_authenticated/playground/chats/$sessionId': {
+      id: '/_authenticated/playground/chats/$sessionId'
       path: '/$sessionId'
-      fullPath: '/chats/$sessionId'
-      preLoaderRoute: typeof AuthenticatedChatsSessionIdRouteImport
-      parentRoute: typeof AuthenticatedChatsRoute
+      fullPath: '/playground/chats/$sessionId'
+      preLoaderRoute: typeof AuthenticatedPlaygroundChatsSessionIdRouteImport
+      parentRoute: typeof AuthenticatedPlaygroundChatsRoute
     }
   }
 }
 
-interface AuthenticatedChatsRouteChildren {
-  AuthenticatedChatsSessionIdRoute: typeof AuthenticatedChatsSessionIdRoute
-  AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
+interface AuthenticatedPlaygroundChatsRouteChildren {
+  AuthenticatedPlaygroundChatsSessionIdRoute: typeof AuthenticatedPlaygroundChatsSessionIdRoute
+  AuthenticatedPlaygroundChatsIndexRoute: typeof AuthenticatedPlaygroundChatsIndexRoute
 }
 
-const AuthenticatedChatsRouteChildren: AuthenticatedChatsRouteChildren = {
-  AuthenticatedChatsSessionIdRoute: AuthenticatedChatsSessionIdRoute,
-  AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
-}
-
-const AuthenticatedChatsRouteWithChildren =
-  AuthenticatedChatsRoute._addFileChildren(AuthenticatedChatsRouteChildren)
-
-interface AuthenticatedFlashcardsRouteChildren {
-  AuthenticatedFlashcardsTopicIdRoute: typeof AuthenticatedFlashcardsTopicIdRoute
-  AuthenticatedFlashcardsIndexRoute: typeof AuthenticatedFlashcardsIndexRoute
-}
-
-const AuthenticatedFlashcardsRouteChildren: AuthenticatedFlashcardsRouteChildren =
+const AuthenticatedPlaygroundChatsRouteChildren: AuthenticatedPlaygroundChatsRouteChildren =
   {
-    AuthenticatedFlashcardsTopicIdRoute: AuthenticatedFlashcardsTopicIdRoute,
-    AuthenticatedFlashcardsIndexRoute: AuthenticatedFlashcardsIndexRoute,
+    AuthenticatedPlaygroundChatsSessionIdRoute:
+      AuthenticatedPlaygroundChatsSessionIdRoute,
+    AuthenticatedPlaygroundChatsIndexRoute:
+      AuthenticatedPlaygroundChatsIndexRoute,
   }
 
-const AuthenticatedFlashcardsRouteWithChildren =
-  AuthenticatedFlashcardsRoute._addFileChildren(
-    AuthenticatedFlashcardsRouteChildren,
+const AuthenticatedPlaygroundChatsRouteWithChildren =
+  AuthenticatedPlaygroundChatsRoute._addFileChildren(
+    AuthenticatedPlaygroundChatsRouteChildren,
   )
 
-interface AuthenticatedReportsRouteChildren {
-  AuthenticatedReportsReportIdRoute: typeof AuthenticatedReportsReportIdRoute
-  AuthenticatedReportsIndexRoute: typeof AuthenticatedReportsIndexRoute
+interface AuthenticatedPlaygroundFlashcardsRouteChildren {
+  AuthenticatedPlaygroundFlashcardsTopicIdRoute: typeof AuthenticatedPlaygroundFlashcardsTopicIdRoute
+  AuthenticatedPlaygroundFlashcardsIndexRoute: typeof AuthenticatedPlaygroundFlashcardsIndexRoute
 }
 
-const AuthenticatedReportsRouteChildren: AuthenticatedReportsRouteChildren = {
-  AuthenticatedReportsReportIdRoute: AuthenticatedReportsReportIdRoute,
-  AuthenticatedReportsIndexRoute: AuthenticatedReportsIndexRoute,
+const AuthenticatedPlaygroundFlashcardsRouteChildren: AuthenticatedPlaygroundFlashcardsRouteChildren =
+  {
+    AuthenticatedPlaygroundFlashcardsTopicIdRoute:
+      AuthenticatedPlaygroundFlashcardsTopicIdRoute,
+    AuthenticatedPlaygroundFlashcardsIndexRoute:
+      AuthenticatedPlaygroundFlashcardsIndexRoute,
+  }
+
+const AuthenticatedPlaygroundFlashcardsRouteWithChildren =
+  AuthenticatedPlaygroundFlashcardsRoute._addFileChildren(
+    AuthenticatedPlaygroundFlashcardsRouteChildren,
+  )
+
+interface AuthenticatedPlaygroundReportsRouteChildren {
+  AuthenticatedPlaygroundReportsReportIdRoute: typeof AuthenticatedPlaygroundReportsReportIdRoute
+  AuthenticatedPlaygroundReportsIndexRoute: typeof AuthenticatedPlaygroundReportsIndexRoute
 }
 
-const AuthenticatedReportsRouteWithChildren =
-  AuthenticatedReportsRoute._addFileChildren(AuthenticatedReportsRouteChildren)
+const AuthenticatedPlaygroundReportsRouteChildren: AuthenticatedPlaygroundReportsRouteChildren =
+  {
+    AuthenticatedPlaygroundReportsReportIdRoute:
+      AuthenticatedPlaygroundReportsReportIdRoute,
+    AuthenticatedPlaygroundReportsIndexRoute:
+      AuthenticatedPlaygroundReportsIndexRoute,
+  }
 
-interface AuthenticatedTopicsRouteChildren {
-  AuthenticatedTopicsTopicIdRoute: typeof AuthenticatedTopicsTopicIdRoute
-  AuthenticatedTopicsIndexRoute: typeof AuthenticatedTopicsIndexRoute
+const AuthenticatedPlaygroundReportsRouteWithChildren =
+  AuthenticatedPlaygroundReportsRoute._addFileChildren(
+    AuthenticatedPlaygroundReportsRouteChildren,
+  )
+
+interface AuthenticatedPlaygroundTopicsRouteChildren {
+  AuthenticatedPlaygroundTopicsTopicIdRoute: typeof AuthenticatedPlaygroundTopicsTopicIdRoute
+  AuthenticatedPlaygroundTopicsIndexRoute: typeof AuthenticatedPlaygroundTopicsIndexRoute
 }
 
-const AuthenticatedTopicsRouteChildren: AuthenticatedTopicsRouteChildren = {
-  AuthenticatedTopicsTopicIdRoute: AuthenticatedTopicsTopicIdRoute,
-  AuthenticatedTopicsIndexRoute: AuthenticatedTopicsIndexRoute,
+const AuthenticatedPlaygroundTopicsRouteChildren: AuthenticatedPlaygroundTopicsRouteChildren =
+  {
+    AuthenticatedPlaygroundTopicsTopicIdRoute:
+      AuthenticatedPlaygroundTopicsTopicIdRoute,
+    AuthenticatedPlaygroundTopicsIndexRoute:
+      AuthenticatedPlaygroundTopicsIndexRoute,
+  }
+
+const AuthenticatedPlaygroundTopicsRouteWithChildren =
+  AuthenticatedPlaygroundTopicsRoute._addFileChildren(
+    AuthenticatedPlaygroundTopicsRouteChildren,
+  )
+
+interface AuthenticatedPlaygroundRouteChildren {
+  AuthenticatedPlaygroundChatsRoute: typeof AuthenticatedPlaygroundChatsRouteWithChildren
+  AuthenticatedPlaygroundFlashcardsRoute: typeof AuthenticatedPlaygroundFlashcardsRouteWithChildren
+  AuthenticatedPlaygroundReportsRoute: typeof AuthenticatedPlaygroundReportsRouteWithChildren
+  AuthenticatedPlaygroundTopicsRoute: typeof AuthenticatedPlaygroundTopicsRouteWithChildren
+  AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
+  AuthenticatedPlaygroundSessionTopicIdRoute: typeof AuthenticatedPlaygroundSessionTopicIdRoute
 }
 
-const AuthenticatedTopicsRouteWithChildren =
-  AuthenticatedTopicsRoute._addFileChildren(AuthenticatedTopicsRouteChildren)
+const AuthenticatedPlaygroundRouteChildren: AuthenticatedPlaygroundRouteChildren =
+  {
+    AuthenticatedPlaygroundChatsRoute:
+      AuthenticatedPlaygroundChatsRouteWithChildren,
+    AuthenticatedPlaygroundFlashcardsRoute:
+      AuthenticatedPlaygroundFlashcardsRouteWithChildren,
+    AuthenticatedPlaygroundReportsRoute:
+      AuthenticatedPlaygroundReportsRouteWithChildren,
+    AuthenticatedPlaygroundTopicsRoute:
+      AuthenticatedPlaygroundTopicsRouteWithChildren,
+    AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,
+    AuthenticatedPlaygroundSessionTopicIdRoute:
+      AuthenticatedPlaygroundSessionTopicIdRoute,
+  }
+
+const AuthenticatedPlaygroundRouteWithChildren =
+  AuthenticatedPlaygroundRoute._addFileChildren(
+    AuthenticatedPlaygroundRouteChildren,
+  )
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedChatsRoute: typeof AuthenticatedChatsRouteWithChildren
-  AuthenticatedFlashcardsRoute: typeof AuthenticatedFlashcardsRouteWithChildren
-  AuthenticatedReportsRoute: typeof AuthenticatedReportsRouteWithChildren
-  AuthenticatedTopicsRoute: typeof AuthenticatedTopicsRouteWithChildren
-  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
-  AuthenticatedSessionTopicIdRoute: typeof AuthenticatedSessionTopicIdRoute
+  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedPlaygroundRoute: typeof AuthenticatedPlaygroundRouteWithChildren
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedChatsRoute: AuthenticatedChatsRouteWithChildren,
-  AuthenticatedFlashcardsRoute: AuthenticatedFlashcardsRouteWithChildren,
-  AuthenticatedReportsRoute: AuthenticatedReportsRouteWithChildren,
-  AuthenticatedTopicsRoute: AuthenticatedTopicsRouteWithChildren,
-  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
-  AuthenticatedSessionTopicIdRoute: AuthenticatedSessionTopicIdRoute,
+  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedPlaygroundRoute: AuthenticatedPlaygroundRouteWithChildren,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -434,6 +534,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,

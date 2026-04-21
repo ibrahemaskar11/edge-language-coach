@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useTopics, useStats, useSessions, useFlashcardDecks, useRecommendedTopics } from "@/hooks/use-api";
 
-export const Route = createFileRoute("/_authenticated/")({
+export const Route = createFileRoute("/_authenticated/playground/")({
   component: PlaygroundPage,
 });
 
@@ -52,7 +52,7 @@ function PlaygroundPage() {
           Quick Access
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Link to="/topics">
+          <Link to="/playground/topics">
             <Card className="border-border/50 transition-colors hover:bg-accent/50">
               <CardContent className="p-5">
                 <p className="font-semibold">New Session</p>
@@ -62,7 +62,7 @@ function PlaygroundPage() {
               </CardContent>
             </Card>
           </Link>
-          <Link to="/flashcards">
+          <Link to="/playground/flashcards">
             <Card className="border-border/50 transition-colors hover:bg-accent/50">
               <CardContent className="p-5">
                 <p className="font-semibold">Flashcards</p>
@@ -72,7 +72,7 @@ function PlaygroundPage() {
               </CardContent>
             </Card>
           </Link>
-          <Link to="/reports">
+          <Link to="/playground/reports">
             <Card className="border-border/50 transition-colors hover:bg-accent/50">
               <CardContent className="p-5">
                 <p className="font-semibold">Reports</p>
@@ -92,7 +92,7 @@ function PlaygroundPage() {
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {recommendedTopics.map((topic) => (
-            <Link key={topic.id} to="/topics/$topicId" params={{ topicId: topic.id }}>
+            <Link key={topic.id} to="/playground/topics/$topicId" params={{ topicId: topic.id }}>
               <Card className="border-border/50 transition-colors hover:bg-accent/50">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between">
@@ -116,7 +116,7 @@ function PlaygroundPage() {
         </div>
         <div className="text-right">
           <Link
-            to="/topics"
+            to="/playground/topics"
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             View all topics <ArrowRight className="inline h-3 w-3" />

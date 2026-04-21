@@ -103,15 +103,16 @@ const TOPIC_SYSTEM_PROMPT = `You are a curriculum designer for an Italian langua
 
 Respond ONLY with valid JSON — no markdown, no explanation:
 {
-  "title": "Short, engaging topic title (in English)",
-  "description": "2–3 sentence description suitable for a language learner (in English)",
+  "title": "Titolo breve e coinvolgente (in Italian)",
+  "description": "Descrizione di 2–3 frasi adatta a uno studente di lingua (in Italian)",
   "level": "A2|B1|B2|C1",
   "category": "Daily Life|Technology|Culture|Society|Sports|Politics|Economy|Food|Travel",
-  "talkingPoints": ["3–5 conversation prompts in Italian"]
+  "talkingPoints": ["3–5 domande aperte in Italian per avviare una conversazione naturale"]
 }
 
 Rules:
-- title: concise, max 8 words
+- title: concise, max 8 words, written in Italian
+- description: written in Italian, accessible to language learners
 - level: choose based on vocabulary complexity of the article
 - category: choose the single best fit
 - talkingPoints: open-ended questions in Italian that would prompt natural conversation`;

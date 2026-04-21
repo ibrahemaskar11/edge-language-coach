@@ -38,3 +38,20 @@ export async function apiFetch<T>(
 
   return res.json();
 }
+
+export async function apiFetchMultipart<T>(
+  path: string,
+  body: FormData
+): Promise<T> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers, // no Content-Type — browser sets multipart boundary
+    body,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || `API error: ${res.status}`);
+  }
+  return res.json();
+}

@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useTopics, useRecommendedTopics } from "@/hooks/use-api";
 
-export const Route = createFileRoute("/_authenticated/topics/")({
+export const Route = createFileRoute("/_authenticated/playground/topics/")({
   component: TopicsPage,
 });
 
@@ -104,7 +104,7 @@ function TopicsPage() {
       ) : (
         <div className="space-y-3">
           {filteredTopics.map((topic) => (
-            <Link key={topic.id} to="/topics/$topicId" params={{ topicId: topic.id }}>
+            <Link key={topic.id} to="/playground/topics/$topicId" params={{ topicId: topic.id }}>
               <Card className="border-border/50 transition-colors hover:bg-accent/50">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between">

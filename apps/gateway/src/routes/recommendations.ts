@@ -4,7 +4,17 @@ import { toCamelCase } from "../utils/camelcase.js";
 interface TopicRow {
   id: string;
   category: string;
+  level: string;
   created_at: string;
+}
+
+const CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
+
+function cefrDistance(a: string | null, b: string): number {
+  if (!a) return 99;
+  const ai = CEFR_ORDER.indexOf(a);
+  const bi = CEFR_ORDER.indexOf(b);
+  return ai === -1 || bi === -1 ? 99 : Math.abs(ai - bi);
 }
 
 interface SessionRow {
@@ -25,7 +35,7 @@ export async function recommendationRoutes(fastify: FastifyInstance) {
       // Fetch active topics
       const { data: topics, error: topicsError } = await fastify.supabase
         .from("topics")
-        .select("id, category, created_at")
+        .select("id, category, level, created_at")
         .eq("is_active", true);
 
       if (topicsError || !topics || topics.length === 0) {
@@ -38,6 +48,14 @@ export async function recommendationRoutes(fastify: FastifyInstance) {
         if (error) return reply.status(500).send({ message: error.message });
         return reply.send(toCamelCase(data));
       }
+
+      // Fetch user level for CEFR-aware scoring
+      const { data: profileData } = await fastify.supabase
+        .from("profiles")
+        .select("italian_level")
+        .eq("id", request.userId)
+        .single();
+      const userLevel = (profileData as { italian_level: string | null } | null)?.italian_level ?? null;
 
       // Fetch user sessions (for completion + category preference scoring)
       const { data: sessions } = await fastify.supabase
@@ -83,6 +101,9 @@ export async function recommendationRoutes(fastify: FastifyInstance) {
         if (!attemptedTopicIds.has(t.id)) score += 5;
         if (flashcardTopicIds.has(t.id)) score += 3;
         if (new Date(t.created_at).getTime() > sevenDaysAgo) score += 3;
+        const dist = cefrDistance(userLevel, t.level);
+        if (dist === 0) score += 15;
+        else if (dist === 1) score += 8;
         return { id: t.id, score };
       });
 

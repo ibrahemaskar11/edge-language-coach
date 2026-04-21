@@ -2,7 +2,7 @@
   "name": "edge-language-coach",
   "private": true,
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "docker compose up redis -d && turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

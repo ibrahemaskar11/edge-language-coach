@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useStats, useReports, useReport } from "@/hooks/use-api";
 
-export const Route = createFileRoute("/_authenticated/reports/")({
+export const Route = createFileRoute("/_authenticated/playground/reports/")({
   component: ReportsPage,
 });
 
@@ -105,7 +105,7 @@ function ReportsPage() {
               {reports.map((report) => (
                 <Link
                   key={report.weekId}
-                  to="/reports/$reportId"
+                  to="/playground/reports/$reportId"
                   params={{ reportId: report.weekId }}
                   className="flex items-center justify-between px-5 py-3 transition-colors hover:bg-accent/50"
                 >

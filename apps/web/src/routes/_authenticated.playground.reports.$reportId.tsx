@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useReport } from "@/hooks/use-api";
 
-export const Route = createFileRoute("/_authenticated/reports/$reportId")({
+export const Route = createFileRoute("/_authenticated/playground/reports/$reportId")({
   component: ReportDetailPage,
 });
 
@@ -22,7 +22,7 @@ function ReportDetailPage() {
   if (error || !report) {
     return (
       <div className="space-y-4">
-        <Link to="/reports" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/playground/reports" className="text-sm text-muted-foreground hover:text-foreground">
           &larr; Back to Reports
         </Link>
         <p className="text-sm text-muted-foreground">Report not found.</p>
@@ -42,7 +42,7 @@ function ReportDetailPage() {
   return (
     <div className="space-y-10">
       <Link
-        to="/reports"
+        to="/playground/reports"
         className="text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         &larr; Back to Reports
@@ -84,7 +84,7 @@ function ReportDetailPage() {
             {report.sessions.map((session) => (
               <Link
                 key={session.id}
-                to="/chats/$sessionId"
+                to="/playground/chats/$sessionId"
                 params={{ sessionId: session.id }}
                 className="flex items-center justify-between px-5 py-3 transition-colors hover:bg-accent/50"
               >

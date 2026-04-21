@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { useSession, useMessages } from "@/hooks/use-api";
 
-export const Route = createFileRoute("/_authenticated/chats/$sessionId")({
+export const Route = createFileRoute("/_authenticated/playground/chats/$sessionId")({
   component: ChatDetailPage,
 });
 
@@ -76,7 +76,7 @@ function ChatDetailPage() {
   if (!session) {
     return (
       <div className="space-y-4">
-        <Link to="/chats" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/playground/chats" className="text-sm text-muted-foreground hover:text-foreground">
           &larr; Back to Past Chats
         </Link>
         <p>Session not found.</p>
@@ -97,7 +97,7 @@ function ChatDetailPage() {
   return (
     <div className="flex flex-col gap-6">
       <Link
-        to="/chats"
+        to="/playground/chats"
         className="text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         &larr; Back to Past Chats
@@ -149,6 +149,21 @@ function ChatDetailPage() {
                       className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium"
                     >
                       {v}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(session as any).summary.grammarFocus?.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-xs text-muted-foreground">Grammar focus</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(session as any).summary.grammarFocus.map((g: string) => (
+                    <span
+                      key={g}
+                      className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium"
+                    >
+                      {g}
                     </span>
                   ))}
                 </div>

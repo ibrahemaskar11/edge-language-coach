@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useSessions } from "@/hooks/use-api";
 
-export const Route = createFileRoute("/_authenticated/chats/")({
+export const Route = createFileRoute("/_authenticated/playground/chats/")({
   component: ChatsPage,
 });
 
@@ -33,7 +33,7 @@ function ChatsPage() {
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">
               No conversations yet.{" "}
-              <Link to="/topics" className="underline hover:text-foreground">
+              <Link to="/playground/topics" className="underline hover:text-foreground">
                 Start your first session!
               </Link>
             </p>
@@ -44,7 +44,7 @@ function ChatsPage() {
           {sessions.map((session) => (
             <Link
               key={session.id}
-              to="/chats/$sessionId"
+              to="/playground/chats/$sessionId"
               params={{ sessionId: session.id }}
             >
               <Card className="border-border/50 transition-colors hover:bg-accent/50">

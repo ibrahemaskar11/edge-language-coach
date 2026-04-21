@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useTopic } from "@/hooks/use-api";
 
-export const Route = createFileRoute("/_authenticated/topics/$topicId")({
+export const Route = createFileRoute("/_authenticated/playground/topics/$topicId")({
   component: TopicDetailPage,
 });
 
@@ -25,7 +25,7 @@ function TopicDetailPage() {
   if (!topic) {
     return (
       <div className="space-y-4">
-        <Link to="/topics" className="text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/playground/topics" className="text-sm text-muted-foreground hover:text-foreground">
           &larr; Back to Topics
         </Link>
         <p>Topic not found.</p>
@@ -34,20 +34,20 @@ function TopicDetailPage() {
   }
 
   const handleStartSession = () => {
-    navigate({ to: "/session/$topicId", params: { topicId } });
+    navigate({ to: "/playground/session/$topicId", params: { topicId } });
   };
 
   return (
     <div className="space-y-8">
       <Link
-        to="/topics"
+        to="/playground/topics"
         className="text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         &larr; Back to Topics
       </Link>
 
       <div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-3xl font-bold tracking-tight">{topic.title}</h1>
           <Badge variant="secondary" className="text-xs">
             {topic.level}

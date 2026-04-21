@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch, apiFetchMultipart } from "./api";
 import type {
   Topic,
   Session,
@@ -95,6 +95,40 @@ export const sendMessage = (sessionId: string, body: SendMessageInput) =>
 
 export const endSession = (sessionId: string) =>
   apiFetch<Session>(`/sessions/${sessionId}/end`, { method: "POST" });
+
+export const transcribeAudio = async (blob: Blob): Promise<string> => {
+  const form = new FormData();
+  form.append("audio", blob, "audio.webm");
+  const data = await apiFetchMultipart<{ transcript: string }>("/transcribe", form);
+  return data.transcript;
+};
+
+// ─── Placement questions ──────────────────────────────────
+export interface PlacementQuestion {
+  id: string;
+  level: string;
+  question: string;
+  options: string[];
+  answer: number;
+  sortOrder: number;
+}
+
+export const fetchPlacementQuestions = () =>
+  apiFetch<PlacementQuestion[]>("/onboarding/questions");
+
+// ─── Profile ──────────────────────────────────────────────
+export interface UserProfile {
+  italianLevel: string | null;
+  onboardingCompleted: boolean;
+}
+
+export const fetchProfile = () => apiFetch<UserProfile>("/profile");
+
+export const updateProfile = (body: Partial<UserProfile>) =>
+  apiFetch<UserProfile>("/profile", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
 
 // ─── Recommendations ──────────────────────────────────────
 export const fetchRecommendedTopics = () => apiFetch<Topic[]>("/recommendations");

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useDueFlashcards, useReviewFlashcard, useTopic } from "@/hooks/use-api";
 
-export const Route = createFileRoute("/_authenticated/flashcards/$topicId")({
+export const Route = createFileRoute("/_authenticated/playground/flashcards/$topicId")({
   component: FlashcardReviewPage,
 });
 
@@ -55,7 +55,7 @@ function FlashcardReviewPage() {
   return (
     <div className="space-y-6">
       <Link
-        to="/flashcards"
+        to="/playground/flashcards"
         className="text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         &larr; Back to Flashcards
@@ -86,7 +86,7 @@ function FlashcardReviewPage() {
               : "Great work. Come back later for more."}
           </p>
           <Button asChild variant="outline">
-            <Link to="/flashcards">Back to Flashcards</Link>
+            <Link to="/playground/flashcards">Back to Flashcards</Link>
           </Button>
         </div>
       ) : (

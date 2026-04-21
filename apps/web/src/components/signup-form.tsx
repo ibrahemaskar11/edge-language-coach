@@ -29,7 +29,7 @@ export function SignupForm({
       }),
     onSuccess: () => {
       toast.success("Account created!");
-      navigate({ to: "/" });
+      navigate({ to: "/playground" });
     },
     onError: (error) => {
       toast.error(error.message);
