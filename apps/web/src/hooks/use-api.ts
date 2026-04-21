@@ -140,6 +140,33 @@ export function useSendMessage(sessionId: string) {
   });
 }
 
+// ─── Placement questions ──────────────────────────────────
+export function usePlacementQuestions() {
+  return useQuery({
+    queryKey: ["placement-questions"],
+    queryFn: api.fetchPlacementQuestions,
+    staleTime: Infinity,
+  });
+}
+
+// ─── Profile ─────────────────────────────────────────────
+export function useProfile() {
+  return useQuery({
+    queryKey: ["profile"],
+    queryFn: api.fetchProfile,
+  });
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Partial<api.UserProfile>) => api.updateProfile(body),
+    onSuccess: (data) => {
+      qc.setQueryData(["profile"], data);
+    },
+  });
+}
+
 // ─── Recommendations ─────────────────────────────────────
 export function useRecommendedTopics() {
   return useQuery({

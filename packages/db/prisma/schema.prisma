@@ -10,12 +10,14 @@ datasource db {
 }
 
 model Profile {
-  id          String   @id @default(uuid())
-  email       String   @unique
-  fullName    String?
-  dateOfBirth DateTime? @db.Date @map("date_of_birth")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  fullName            String?
+  dateOfBirth         DateTime? @db.Date @map("date_of_birth")
+  italianLevel        String?   @map("italian_level")
+  onboardingCompleted Boolean   @default(false) @map("onboarding_completed")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   sessions       Session[]
   userTopics     UserTopic[]
@@ -82,6 +84,18 @@ model UserFlashcard {
 
   @@unique([userId, flashcardId])
   @@map("user_flashcards")
+}
+
+model PlacementQuestion {
+  id        String   @id @default(uuid())
+  level     String
+  question  String
+  options   String[]
+  answer    Int
+  sortOrder Int      @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("placement_questions")
 }
 
 model Session {

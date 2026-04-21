@@ -1,4 +1,3 @@
-import "dotenv/config";
 import express from "express";
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
@@ -39,7 +38,7 @@ app.post("/scrape", async (_req, res) => {
   res.status(202).json({ message: "scrape job enqueued" });
 });
 
-const port = process.env.PORT ?? 3002;
+const port = process.env.WORKERS_PORT ?? 3002;
 app.listen(port, () => {
   console.log(`Workers running on :${port} — Bull Board at /queues`);
 });

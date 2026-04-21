@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { useFlashcardDecks } from "@/hooks/use-api";
 
-export const Route = createFileRoute("/_authenticated/flashcards/")({
+export const Route = createFileRoute("/_authenticated/playground/flashcards/")({
   component: FlashcardsPage,
 });
 
@@ -67,7 +67,7 @@ function FlashcardsPage() {
             {decks.map((deck) => (
               <Link
                 key={deck.topicId}
-                to="/flashcards/$topicId"
+                to="/playground/flashcards/$topicId"
                 params={{ topicId: deck.topicId }}
               >
                 <Card className="border-border/50 transition-colors hover:bg-accent/50">

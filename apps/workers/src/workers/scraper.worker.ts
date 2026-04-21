@@ -9,9 +9,6 @@ export function createScraperWorker() {
     jobId: "scrape-cron", // fixed ID prevents duplicate cron entries on restart
   });
 
-  // Trigger immediately on first boot
-  scraperQueue.add("startup", {}, { priority: 1 });
-
   return new Worker(
     "topic-scrape",
     async () => { await runScraper(); },

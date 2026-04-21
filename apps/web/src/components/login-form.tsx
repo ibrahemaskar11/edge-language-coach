@@ -21,7 +21,7 @@ export function LoginForm({
       signIn(email, password),
     onSuccess: () => {
       toast.success("Welcome back!");
-      navigate({ to: "/" });
+      navigate({ to: "/playground" });
     },
     onError: (error) => {
       toast.error(error.message);

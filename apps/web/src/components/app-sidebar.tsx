@@ -4,6 +4,7 @@ import { useAuthStore, signOut } from "@/lib/auth";
 import { useTheme } from "@/hooks/use-theme";
 import { Spinner } from "@/components/ui/spinner";
 import { Logo } from "@/components/logo";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 function IconPlayground({ className }: { className?: string }) {
   return (
@@ -82,35 +83,38 @@ function IconMoon({ className }: { className?: string }) {
 }
 
 const navItems = [
-  { title: "Playground", to: "/", icon: IconPlayground },
-  { title: "Topics", to: "/topics", icon: IconTopics },
-  { title: "Flashcards", to: "/flashcards", icon: IconFlashcards },
-  { title: "Past Chats", to: "/chats", icon: IconPastChats },
-  { title: "Reports", to: "/reports", icon: IconReports },
+  { title: "Playground", to: "/playground", icon: IconPlayground },
+  { title: "Topics", to: "/playground/topics", icon: IconTopics },
+  { title: "Flashcards", to: "/playground/flashcards", icon: IconFlashcards },
+  { title: "Past Chats", to: "/playground/chats", icon: IconPastChats },
+  { title: "Reports", to: "/playground/reports", icon: IconReports },
 ] as const;
 
-export function AppSidebar() {
+interface NavContentProps {
+  currentPath: string;
+  onNavigate?: () => void;
+}
+
+function NavContent({ currentPath, onNavigate }: NavContentProps) {
   const user = useAuthStore((s) => s.user);
   const { theme, toggleTheme } = useTheme();
-  const router = useRouterState();
-  const currentPath = router.location.pathname;
 
   const logout = useMutation({
     mutationFn: signOut,
   });
 
   function isActive(to: string) {
-    if (to === "/") return currentPath === "/";
+    if (to === "/playground") return currentPath === "/playground" || currentPath === "/playground/";
     return currentPath.startsWith(to);
   }
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-border/40 bg-sidebar text-sidebar-foreground">
+    <div className="flex h-full flex-col">
       {/* Logo */}
       <div className="px-4 py-5">
-        <Link to="/" className="flex items-center gap-3">
-          <Logo size={32} />
-          <span className="text-sm font-semibold">edge.ai</span>
+        <Link to="/playground" onClick={onNavigate} className="flex items-center gap-2.5">
+          <Logo size={28} />
+          <span className="text-sm font-semibold tracking-tight">edge.ai</span>
         </Link>
       </div>
 
@@ -122,6 +126,7 @@ export function AppSidebar() {
             <Link
               key={item.title}
               to={item.to}
+              onClick={onNavigate}
               className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
                 active
                   ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
@@ -162,6 +167,32 @@ export function AppSidebar() {
           </button>
         </div>
       </div>
-    </aside>
+    </div>
+  );
+}
+
+interface AppSidebarProps {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
+
+export function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
+  const router = useRouterState();
+  const currentPath = router.location.pathname;
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex h-screen w-64 shrink-0 flex-col border-r border-border/40 bg-sidebar text-sidebar-foreground">
+        <NavContent currentPath={currentPath} />
+      </aside>
+
+      {/* Mobile drawer */}
+      <Sheet open={mobileOpen} onOpenChange={(open) => { if (!open) onMobileClose?.(); }}>
+        <SheetContent side="left" className="w-64 p-0 bg-sidebar text-sidebar-foreground">
+          <NavContent currentPath={currentPath} onNavigate={onMobileClose} />
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
