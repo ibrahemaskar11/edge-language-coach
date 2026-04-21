@@ -14,17 +14,26 @@ export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(getStoredTheme);
 
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("dark", theme === "dark");
+    document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem("theme", theme);
   }, [theme]);
 
   const toggleTheme = () => {
-    document.documentElement.classList.add("theme-transitioning");
-    setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
-    setTimeout(() => {
-      document.documentElement.classList.remove("theme-transitioning");
-    }, 400);
+    const newTheme = theme === "dark" ? "light" : "dark";
+
+    const applyChange = () => {
+      document.documentElement.classList.toggle("dark", newTheme === "dark");
+      localStorage.setItem("theme", newTheme);
+      setThemeState(newTheme);
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const vt = (document as any).startViewTransition;
+    if (typeof vt === "function") {
+      vt.call(document, applyChange);
+    } else {
+      applyChange();
+    }
   };
 
   return { theme, toggleTheme };
