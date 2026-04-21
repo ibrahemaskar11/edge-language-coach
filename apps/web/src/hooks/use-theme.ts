@@ -19,8 +19,13 @@ export function useTheme() {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  const toggleTheme = () =>
+  const toggleTheme = () => {
+    document.documentElement.classList.add("theme-transitioning");
     setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
+    setTimeout(() => {
+      document.documentElement.classList.remove("theme-transitioning");
+    }, 400);
+  };
 
   return { theme, toggleTheme };
 }
