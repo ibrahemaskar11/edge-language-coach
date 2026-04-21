@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 
 type Theme = "light" | "dark";
 
@@ -24,7 +25,7 @@ export function useTheme() {
     const applyChange = () => {
       document.documentElement.classList.toggle("dark", newTheme === "dark");
       localStorage.setItem("theme", newTheme);
-      setThemeState(newTheme);
+      flushSync(() => setThemeState(newTheme));
     };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
