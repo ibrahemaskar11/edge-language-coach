@@ -1,6 +1,7 @@
 import RSSParser from "rss-parser";
 import { groq } from "../lib/groq.js";
 import { createServiceClient } from "../lib/supabase.js";
+import type { Logger } from "../lib/logger.js";
 
 // ─── Configuration ────────────────────────────────────────
 
@@ -56,7 +57,7 @@ interface TopicExtract {
 
 // ─── RSS Fetcher ─────────────────────────────────────────
 
-async function fetchArticles(feedUrls?: string[]): Promise<Article[]> {
+async function fetchArticles(log: Logger, feedUrls?: string[]): Promise<Article[]> {
   const urls = feedUrls ?? DEFAULT_FEEDS;
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
   const parser = new RSSParser({ timeout: 10000 });
@@ -77,7 +78,7 @@ async function fetchArticles(feedUrls?: string[]): Promise<Article[]> {
         const desc = item.contentSnippet ?? item.content ?? item.summary ?? title;
 
         if (isHeavy(title, desc)) {
-          console.log(`scraper-job: skipping heavy article "${title}"`);
+          log.debug({ title }, "skipping heavy article");
           continue;
         }
 
@@ -85,7 +86,7 @@ async function fetchArticles(feedUrls?: string[]): Promise<Article[]> {
         count++;
       }
     } catch (err) {
-      console.warn(`scraper-job: failed to parse ${url}: ${err}`);
+      log.warn({ url, err: (err as Error).message }, "failed to parse feed");
     }
   }
 
@@ -148,7 +149,7 @@ function isDuplicate(newTitle: string, existing: string[]): boolean {
 
 // ─── Rotator ─────────────────────────────────────────────
 
-async function runRotator(): Promise<void> {
+async function runRotator(log: Logger): Promise<void> {
   const db = createServiceClient();
 
   const { data: topics } = await db.from("topics").select("id, created_at");
@@ -180,23 +181,23 @@ async function runRotator(): Promise<void> {
 
   if (activeIds.length > 0) {
     await db.from("topics").update({ is_active: true }).in("id", activeIds);
-    console.log(`rotator: activated ${activeIds.length} topics`);
+    log.info({ count: activeIds.length }, "rotator activated topics");
   }
   if (inactiveIds.length > 0) {
     await db.from("topics").update({ is_active: false }).in("id", inactiveIds);
-    console.log(`rotator: deactivated ${inactiveIds.length} topics`);
+    log.info({ count: inactiveIds.length }, "rotator deactivated topics");
   }
 }
 
 // ─── Main Scraper ─────────────────────────────────────────
 
-export async function runScraper(): Promise<void> {
-  console.log("scraper-job: starting run");
+export async function runScraper(log: Logger): Promise<void> {
+  log.info("starting scraper run");
   const db = createServiceClient();
   const feedUrls = process.env.RSS_FEEDS?.split(",") ?? DEFAULT_FEEDS;
 
-  const articles = await fetchArticles(feedUrls);
-  console.log(`scraper-job: fetched ${articles.length} articles`);
+  const articles = await fetchArticles(log, feedUrls);
+  log.info({ count: articles.length }, "fetched articles");
 
   // Fetch existing titles from last 30 days for deduplication
   const cutoff30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -215,12 +216,12 @@ export async function runScraper(): Promise<void> {
     try {
       topic = await extractTopic(article.title, article.description);
     } catch (err) {
-      console.warn(`scraper-job: groq error for "${article.title}": ${err}`);
+      log.warn({ title: article.title, err: (err as Error).message }, "groq topic extraction error");
       continue;
     }
 
     if (isDuplicate(topic.title, existingTitles)) {
-      console.log(`scraper-job: skipping duplicate "${topic.title}"`);
+      log.debug({ title: topic.title }, "skipping duplicate");
       skipped++;
       continue;
     }
@@ -230,7 +231,7 @@ export async function runScraper(): Promise<void> {
 
     const cap = CATEGORY_CAPS[topic.category] ?? 2;
     if ((categoryCounts[topic.category] ?? 0) >= cap) {
-      console.log(`scraper-job: skipping "${topic.title}" — category "${topic.category}" cap reached`);
+      log.debug({ title: topic.title, category: topic.category }, "category cap reached");
       skipped++;
       continue;
     }
@@ -244,21 +245,21 @@ export async function runScraper(): Promise<void> {
     });
 
     if (error) {
-      console.warn(`scraper-job: insert error for "${topic.title}": ${error.message}`);
+      log.warn({ title: topic.title, err: error.message }, "topic insert error");
       continue;
     }
 
     existingTitles.push(topic.title);
     categoryCounts[topic.category] = (categoryCounts[topic.category] ?? 0) + 1;
     inserted++;
-    console.log(`scraper-job: inserted "${topic.title}" [${topic.level}/${topic.category}]`);
+    log.info({ title: topic.title, level: topic.level, category: topic.category }, "inserted topic");
 
     // Rate-limit: ~5s between Groq calls to stay under 12k TPM free tier
     await new Promise((r) => setTimeout(r, 5000));
   }
 
-  console.log(`scraper-job: complete — inserted=${inserted} skipped=${skipped}`);
+  log.info({ inserted, skipped }, "scraper complete");
 
   // Re-score and rotate the active topic pool
-  await runRotator();
+  await runRotator(log);
 }

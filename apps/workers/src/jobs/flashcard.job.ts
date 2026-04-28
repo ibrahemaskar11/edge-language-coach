@@ -1,5 +1,6 @@
 import { groq } from "../lib/groq.js";
 import { createServiceClient } from "../lib/supabase.js";
+import type { Logger } from "../lib/logger.js";
 
 const FLASHCARD_SYSTEM_PROMPT = `You are an Italian language learning assistant. Given a conversation transcript from a coaching session, extract 5–8 flashcard items the student should review.
 
@@ -21,7 +22,7 @@ Rules:
 
 const VALID_TYPES = new Set(["VOCABULARY", "GRAMMAR", "TRANSLATE TO ITALIAN"]);
 
-export async function runFlashcardGeneration(sessionId: string, userId: string): Promise<number> {
+export async function runFlashcardGeneration(sessionId: string, userId: string, log: Logger): Promise<number> {
   const db = createServiceClient();
 
   // 1. Fetch session + topic title
@@ -46,7 +47,7 @@ export async function runFlashcardGeneration(sessionId: string, userId: string):
     .order("created_at", { ascending: true });
 
   if (!messages || messages.length === 0) {
-    console.log(`flashcard-job: session ${sessionId} has no messages, skipping`);
+    log.info("session has no messages, skipping");
     return 0;
   }
 
@@ -95,7 +96,7 @@ export async function runFlashcardGeneration(sessionId: string, userId: string):
       .single();
 
     if (fcErr || !inserted) {
-      console.warn(`flashcard-job: insert error: ${fcErr?.message}`);
+      log.warn({ err: fcErr?.message }, "flashcard insert error");
       continue;
     }
 
@@ -111,9 +112,9 @@ export async function runFlashcardGeneration(sessionId: string, userId: string):
 
     existingFronts.add(normFront);
     generated++;
-    console.log(`flashcard-job: created "${card.front}" [${cardType}]`);
+    log.debug({ front: card.front, type: cardType }, "created flashcard");
   }
 
-  console.log(`flashcard-job: session ${sessionId} — generated ${generated} new flashcards`);
+  log.info({ generated }, "flashcard generation complete");
   return generated;
 }

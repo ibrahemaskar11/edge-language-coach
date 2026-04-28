@@ -1,5 +1,6 @@
 import { groq } from "../lib/groq.js";
 import { createServiceClient } from "../lib/supabase.js";
+import type { Logger } from "../lib/logger.js";
 
 const SUMMARY_SYSTEM_PROMPT = `You are an Italian language learning analyst. Given a coaching session transcript and the feedback that was generated, produce a structured summary of the student's performance.
 
@@ -32,7 +33,7 @@ interface GoodPointItem {
   reason: string;
 }
 
-export async function runSummaryGeneration(sessionId: string, userId: string): Promise<void> {
+export async function runSummaryGeneration(sessionId: string, userId: string, log: Logger): Promise<void> {
   const db = createServiceClient();
 
   // 1. Fetch session + validate
@@ -58,7 +59,7 @@ export async function runSummaryGeneration(sessionId: string, userId: string): P
     .order("created_at", { ascending: true });
 
   if (!messages || messages.length === 0) {
-    console.log(`summary-job: session ${sessionId} has no messages, skipping`);
+    log.info("session has no messages, skipping");
     return;
   }
 
@@ -128,5 +129,5 @@ export async function runSummaryGeneration(sessionId: string, userId: string): P
 
   if (error) throw new Error(`Failed to update session summary: ${error.message}`);
 
-  console.log(`summary-job: session ${sessionId} — summary stored (score ${summary.score})`);
+  log.info({ score: summary.score }, "summary stored");
 }

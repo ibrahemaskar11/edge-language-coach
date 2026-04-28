@@ -16,7 +16,8 @@ export const authPlugin = fp(async (fastify: FastifyInstance) => {
     "onRequest",
     async (request: FastifyRequest, reply: FastifyReply) => {
       if (
-        request.url === "/health" ||
+        request.url === "/livez" ||
+        request.url === "/readyz" ||
         request.url.startsWith("/api/auth/callback")
       ) {
         return;

@@ -1,7 +1,9 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
+import { randomUUID } from "node:crypto";
 import { env } from "./env.js";
+import { logger } from "./lib/logger.js";
 import { supabasePlugin } from "./plugins/supabase.js";
 import { groqPlugin } from "./plugins/groq.js";
 import { authPlugin } from "./plugins/auth.js";
@@ -16,8 +18,14 @@ import { recommendationRoutes } from "./routes/recommendations.js";
 import { reportRoutes } from "./routes/reports.js";
 import { profileRoutes } from "./routes/profile.js";
 import { transcribeRoutes } from "./routes/transcribe.js";
+import { healthRoutes } from "./routes/health.js";
 
-const app = Fastify({ logger: true });
+const app = Fastify({
+  loggerInstance: logger,
+  genReqId: (req) => (req.headers["x-request-id"] as string | undefined) ?? randomUUID(),
+  requestIdHeader: "x-request-id",
+  requestIdLogLabel: "requestId",
+});
 
 await app.register(cors, {
   origin: true,
@@ -28,6 +36,7 @@ await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
 await app.register(supabasePlugin);
 await app.register(groqPlugin);
 await app.register(authPlugin);
+await app.register(healthRoutes);
 await app.register(authRoutes);
 await app.register(topicRoutes);
 await app.register(sessionRoutes);
@@ -39,8 +48,6 @@ await app.register(recommendationRoutes);
 await app.register(reportRoutes);
 await app.register(profileRoutes);
 await app.register(transcribeRoutes);
-
-app.get("/health", async () => ({ status: "ok" }));
 
 try {
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
