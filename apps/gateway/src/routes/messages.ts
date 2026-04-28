@@ -79,6 +79,11 @@ export async function messageRoutes(fastify: FastifyInstance) {
   // POST /api/sessions/:id/messages — send a user message and get AI response
   fastify.post<{ Params: { id: string } }>(
     "/api/sessions/:id/messages",
+    {
+      config: {
+        rateLimit: { max: 20, timeWindow: "1 minute" },
+      },
+    },
     async (request, reply) => {
       let body;
       try {
@@ -170,10 +175,10 @@ export async function messageRoutes(fastify: FastifyInstance) {
         { role: "user", content: body.content },
       ];
 
-      // Call Groq
+      // Call Groq via circuit breaker
       let llmResponse: ReturnType<typeof llmCoachResponseSchema.parse>;
       try {
-        const completion = await fastify.groq.chat.completions.create({
+        const completion = await fastify.groqChat({
           model: "llama-3.3-70b-versatile",
           messages: groqMessages,
           response_format: { type: "json_object" },
@@ -184,8 +189,11 @@ export async function messageRoutes(fastify: FastifyInstance) {
         const raw = completion.choices[0]?.message?.content ?? "{}";
         llmResponse = llmCoachResponseSchema.parse(JSON.parse(raw));
       } catch (err) {
-        fastify.log.error(err, "Groq call failed");
-        return reply.status(502).send({ message: "AI service error" });
+        const isOpen = (err as Error & { code?: string }).code === "EOPENBREAKER";
+        fastify.log.error({ err, breakerOpen: isOpen }, "Groq chat call failed");
+        return reply.status(503).send({
+          message: isOpen ? "AI service temporarily unavailable" : "AI service error",
+        });
       }
 
       // Insert AI message
