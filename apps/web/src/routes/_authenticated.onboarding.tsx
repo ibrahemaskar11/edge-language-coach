@@ -95,10 +95,16 @@ function OnboardingQuiz() {
           <p className="mb-10 text-sm text-muted-foreground/60">Takes about 5 minutes.</p>
           <button
             onClick={() => { setAnswers(Array(totalQuestions).fill(null)); setStep("quiz"); }}
-            className="w-full rounded-lg bg-primary px-8 py-3.5 font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            disabled={totalQuestions === 0}
+            className="w-full rounded-lg bg-primary px-8 py-3.5 font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Start the test
           </button>
+          {totalQuestions === 0 && (
+            <p className="mt-3 text-xs text-muted-foreground/60">
+              Placement questions aren't available yet — please skip below.
+            </p>
+          )}
           <button
             onClick={handleSkipQuiz}
             className="mt-4 w-full text-sm text-muted-foreground/60 hover:text-muted-foreground transition-colors"
