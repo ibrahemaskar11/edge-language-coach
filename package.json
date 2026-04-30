@@ -2,7 +2,7 @@
   "name": "edge-language-coach",
   "private": true,
   "scripts": {
-    "dev": "docker compose up redis -d && turbo dev",
+    "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
@@ -11,7 +11,8 @@
     "db:seed": "turbo db:seed"
   },
   "devDependencies": {
-    "turbo": "^2"
+    "turbo": "^2",
+    "tsx": "^4"
   },
   "packageManager": "pnpm@10.18.3",
   "pnpm": {

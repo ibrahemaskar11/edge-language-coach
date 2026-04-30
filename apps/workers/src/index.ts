@@ -7,6 +7,29 @@ import { createFlashcardWorker } from "./workers/flashcard.worker.js";
 import { createSummaryWorker } from "./workers/summary.worker.js";
 import { createScraperWorker } from "./workers/scraper.worker.js";
 import { logger } from "./lib/logger.js";
+import { defaultWorkerOptions } from "./lib/queues.js";
+
+const MAX_ATTEMPTS = defaultWorkerOptions.attempts;
+
+function attachDlqListener(worker: ReturnType<typeof createFlashcardWorker>, queueName: string) {
+  worker.on("failed", (job, err) => {
+    if (!job) return;
+    const isDlq = (job.attemptsMade ?? 0) >= MAX_ATTEMPTS;
+    const level = isDlq ? "error" : "warn";
+    logger[level](
+      {
+        dlq: isDlq,
+        queue: queueName,
+        jobId: job.id,
+        jobName: job.name,
+        attempt: job.attemptsMade,
+        maxAttempts: MAX_ATTEMPTS,
+        err: { message: err.message, stack: err.stack },
+      },
+      isDlq ? "job exhausted all retries — dead-lettered" : "job failed, will retry",
+    );
+  });
+}
 
 // Start all workers and keep references for readiness checks
 const workers = {
@@ -14,6 +37,10 @@ const workers = {
   summary: createSummaryWorker(),
   scraper: createScraperWorker(),
 };
+
+attachDlqListener(workers.flashcard, "flashcard-generate");
+attachDlqListener(workers.summary,   "summary-generate");
+attachDlqListener(workers.scraper,   "topic-scrape");
 
 // Bull Board monitoring UI
 const serverAdapter = new ExpressAdapter();

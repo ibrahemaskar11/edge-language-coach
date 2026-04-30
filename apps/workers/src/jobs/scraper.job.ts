@@ -1,7 +1,17 @@
 import RSSParser from "rss-parser";
 import { groq } from "../lib/groq.js";
+import { connection } from "../lib/queues.js";
 import { createServiceClient } from "../lib/supabase.js";
 import type { Logger } from "../lib/logger.js";
+
+// Idempotency: one successful run per 6-hour cron slot
+const SCRAPER_SLOT_TTL = 6 * 60 * 60; // seconds
+
+function currentSlotKey(): string {
+  const d = new Date();
+  const slot = Math.floor(d.getUTCHours() / 6); // 0–3
+  return `scraper:slot:${d.toISOString().slice(0, 10)}:${slot}`;
+}
 
 // ─── Configuration ────────────────────────────────────────
 
@@ -192,6 +202,13 @@ async function runRotator(log: Logger): Promise<void> {
 // ─── Main Scraper ─────────────────────────────────────────
 
 export async function runScraper(log: Logger): Promise<void> {
+  const slotKey = currentSlotKey();
+  const alreadyRan = await connection.get(slotKey);
+  if (alreadyRan) {
+    log.info({ slotKey }, "scraper already completed this slot — skipping");
+    return;
+  }
+
   log.info("starting scraper run");
   const db = createServiceClient();
   const feedUrls = process.env.RSS_FEEDS?.split(",") ?? DEFAULT_FEEDS;
@@ -259,6 +276,9 @@ export async function runScraper(log: Logger): Promise<void> {
   }
 
   log.info({ inserted, skipped }, "scraper complete");
+
+  // Mark this slot as done so retries within the same window are no-ops
+  await connection.set(slotKey, "1", "EX", SCRAPER_SLOT_TTL);
 
   // Re-score and rotate the active topic pool
   await runRotator(log);

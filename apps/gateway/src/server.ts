@@ -6,6 +6,15 @@ import { randomUUID } from "node:crypto";
 import { env } from "./env.js";
 import { logger } from "./lib/logger.js";
 import { connection as redisConnection } from "./lib/queues.js";
+import {
+  httpRequestDuration,
+  httpRequestTotal,
+  groqCircuitBreakerState,
+  queueDepth,
+  activeSessionsGauge,
+  register,
+} from "./lib/metrics.js";
+import { flashcardQueue, summaryQueue } from "./lib/queues.js";
 import { supabasePlugin } from "./plugins/supabase.js";
 import { groqPlugin } from "./plugins/groq.js";
 import { authPlugin } from "./plugins/auth.js";
@@ -31,6 +40,15 @@ const app = Fastify({
   keepAliveTimeout: 5_000,
 });
 
+// Record HTTP request duration and count for Prometheus
+app.addHook("onResponse", (req, reply, done) => {
+  const route = req.routeOptions?.url ?? req.url;
+  const labels = { method: req.method, route, status_code: String(reply.statusCode) };
+  httpRequestDuration.observe(labels, reply.elapsedTime / 1000);
+  httpRequestTotal.inc(labels);
+  done();
+});
+
 await app.register(cors, {
   origin: true,
   credentials: true,
@@ -49,10 +67,39 @@ await app.register(rateLimit, {
   timeWindow: "1 minute",
   redis: redisConnection,
   keyGenerator: (req) => req.userId || req.ip,
-  allowList: (req) => req.url === "/livez" || req.url === "/readyz",
+  allowList: (req) => req.url === "/livez" || req.url === "/readyz" || req.url === "/metrics",
 });
 
 await app.register(healthRoutes);
+
+// Prometheus metrics endpoint
+app.get("/metrics", async (_req, reply) => {
+  // Refresh circuit breaker gauges
+  const { chat, transcribe } = app.groqBreakers;
+  const breakerState = (b: { opened: boolean; halfOpen: boolean }) =>
+    b.opened ? 1 : b.halfOpen ? 2 : 0;
+  groqCircuitBreakerState.set({ breaker: "chat" }, breakerState(chat));
+  groqCircuitBreakerState.set({ breaker: "transcribe" }, breakerState(transcribe));
+
+  // Refresh queue depth gauges
+  const [fcWaiting, sumWaiting] = await Promise.all([
+    flashcardQueue.getWaitingCount(),
+    summaryQueue.getWaitingCount(),
+  ]);
+  queueDepth.set({ queue: "flashcard-generate" }, fcWaiting);
+  queueDepth.set({ queue: "summary-generate" }, sumWaiting);
+
+  // Refresh active sessions gauge
+  const { count } = await app.supabase
+    .from("sessions")
+    .select("id", { head: true, count: "exact" })
+    .eq("status", "active");
+  activeSessionsGauge.set(count ?? 0);
+
+  reply.header("Content-Type", register.contentType);
+  return reply.send(await register.metrics());
+});
+
 await app.register(authRoutes);
 await app.register(topicRoutes);
 await app.register(sessionRoutes);

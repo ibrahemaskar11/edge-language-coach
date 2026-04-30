@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import { connection } from "../lib/queues.js";
+import { connection, defaultWorkerOptions } from "../lib/queues.js";
 import { logger } from "../lib/logger.js";
 import { runFlashcardGeneration } from "../jobs/flashcard.job.js";
 
@@ -16,6 +16,6 @@ export function createFlashcardWorker() {
       });
       await runFlashcardGeneration(sessionId, userId, log);
     },
-    { connection, concurrency: 3 }
+    { connection, concurrency: 3, ...defaultWorkerOptions }
   );
 }

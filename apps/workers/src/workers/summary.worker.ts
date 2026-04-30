@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import { connection } from "../lib/queues.js";
+import { connection, defaultWorkerOptions } from "../lib/queues.js";
 import { logger } from "../lib/logger.js";
 import { runSummaryGeneration } from "../jobs/summary.job.js";
 
@@ -16,6 +16,6 @@ export function createSummaryWorker() {
       });
       await runSummaryGeneration(sessionId, userId, log);
     },
-    { connection, concurrency: 3 }
+    { connection, concurrency: 3, ...defaultWorkerOptions }
   );
 }

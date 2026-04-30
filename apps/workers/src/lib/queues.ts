@@ -19,6 +19,11 @@ connection.on("error", (err) => {
   }
 });
 
+export const defaultWorkerOptions = {
+  attempts: 3,
+  backoff: { type: "exponential" as const, delay: 5_000 },
+};
+
 export const flashcardQueue = new Queue("flashcard-generate", { connection });
 export const summaryQueue   = new Queue("summary-generate",   { connection });
 export const scraperQueue   = new Queue("topic-scrape",       { connection });
