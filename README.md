@@ -168,14 +168,36 @@ curl -X POST http://localhost:8080/admin/mode \
   -d '{"mode":"error"}'
 ```
 
-**3. Demo flow**
+**3. Drive traffic with the breaker driver**
 
-1. Mode = `normal` → send traffic via k6 → breaker closed, p95 healthy.
-2. Switch to `slow` → run k6 again → ~10 requests time out → `groq_circuit_breaker_state{breaker="chat"}` flips to `1` (open) in Grafana.
-3. Subsequent requests fail-fast with 503 instead of hanging — visible in `http_request_duration_seconds`.
-4. Wait 30s (`resetTimeout`) → breaker goes half-open. Switch mock back to `normal` → breaker closes.
+The k6 script at [`load/gateway.js`](load/gateway.js) only hits unauthenticated routes (`/livez`, `/readyz`, `/metrics`, `/api/topics`) — none of which call Groq. To trip the breaker you need traffic on a route that actually invokes `groqChat()`. Use the bundled driver instead:
 
-The `volumeThreshold: 10` in [groq.ts](apps/gateway/src/plugins/groq.ts) means you need at least 10 requests in the rolling window before the breaker can trip — k6 hitting `/messages` is the easiest way to drive that volume.
+```cmd
+:: terminal 1 — start the mock (defaults to normal mode)
+pnpm mock:groq
+
+:: terminal 2 — point the gateway at the mock and enable the demo endpoint
+:: (in .env)
+::   GROQ_BASE_URL=http://host.docker.internal:8080
+::   DEMO_MODE=1
+docker compose up -d --force-recreate gateway
+
+:: terminal 3 — switch mock to slow mode (note Windows quote escaping)
+curl -X POST http://localhost:8080/admin/mode -H "content-type: application/json" -d "{\"mode\":\"slow\"}"
+
+:: terminal 4 — drive 60 requests at 250 ms intervals
+node mocks/breaker-driver.mjs
+```
+
+You'll see the breaker state column transition `closed` → `open` after ~10–15 requests (the `volumeThreshold` in [groq.ts](apps/gateway/src/plugins/groq.ts)). At the same time `groq_circuit_breaker_state{breaker="chat"}` flips to `1` in Grafana.
+
+**4. Reset**
+
+Switch the mock back to `normal`; after 30s (`resetTimeout`) the breaker goes half-open and a successful probe closes it.
+
+```cmd
+curl -X POST http://localhost:8080/admin/mode -H "content-type: application/json" -d "{\"mode\":\"normal\"}"
+```
 
 ## Building for Production
 

@@ -15,6 +15,7 @@ const envSchema = z.object({
   GROQ_API_KEY: z.string().min(1).optional(),
   GROQ_BASE_URL: z.string().url().optional(),
   REDIS_URL: z.string().default("redis://localhost:6379"),
+  DEMO_MODE: z.coerce.boolean().default(false),
 });
 
 export const env = envSchema.parse(process.env);

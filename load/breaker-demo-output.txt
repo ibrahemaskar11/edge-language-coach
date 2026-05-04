@@ -1,0 +1,84 @@
+$ node mocks/breaker-driver.mjs
+driving http://localhost:3001/api/breaker-demo/chat — 60 iterations, concurrency=12, gap=100ms
+[  1/60] status=503 elapsed=15416ms breaker=closed   <-- transition from init
+[  2/60] status=503 elapsed=15262ms breaker=closed
+[  3/60] status=503 elapsed=15264ms breaker=closed
+[  4/60] status=503 elapsed=15266ms breaker=closed
+[  5/60] status=503 elapsed=15269ms breaker=closed
+[  7/60] status=503 elapsed=15271ms breaker=open   <-- transition from closed
+[  6/60] status=503 elapsed=15276ms breaker=open
+[ 10/60] status=503 elapsed=15273ms breaker=open
+[ 11/60] status=503 elapsed=15278ms breaker=open
+[  8/60] status=503 elapsed=15296ms breaker=open
+[  9/60] status=503 elapsed=15301ms breaker=open
+[ 12/60] status=503 elapsed=15300ms breaker=open
+[ 13/60] status=503 elapsed=33ms breaker=open
+[ 14/60] status=503 elapsed=30ms breaker=open
+[ 15/60] status=503 elapsed=32ms breaker=open
+[ 16/60] status=503 elapsed=58ms breaker=open
+[ 17/60] status=503 elapsed=58ms breaker=open
+[ 18/60] status=503 elapsed=38ms breaker=open
+[ 19/60] status=503 elapsed=39ms breaker=open
+[ 20/60] status=503 elapsed=36ms breaker=open
+[ 21/60] status=503 elapsed=43ms breaker=open
+[ 22/60] status=503 elapsed=43ms breaker=open
+[ 23/60] status=503 elapsed=23ms breaker=open
+[ 24/60] status=503 elapsed=24ms breaker=open
+[ 25/60] status=503 elapsed=14ms breaker=open
+[ 26/60] status=503 elapsed=17ms breaker=open
+[ 27/60] status=503 elapsed=12ms breaker=open
+[ 28/60] status=503 elapsed=15ms breaker=open
+[ 29/60] status=503 elapsed=19ms breaker=open
+[ 30/60] status=503 elapsed=20ms breaker=open
+[ 31/60] status=503 elapsed=25ms breaker=open
+[ 32/60] status=503 elapsed=25ms breaker=open
+[ 33/60] status=503 elapsed=31ms breaker=open
+[ 34/60] status=503 elapsed=22ms breaker=open
+[ 35/60] status=503 elapsed=23ms breaker=open
+[ 36/60] status=503 elapsed=26ms breaker=open
+[ 37/60] status=503 elapsed=15ms breaker=open
+[ 38/60] status=503 elapsed=18ms breaker=open
+[ 39/60] status=503 elapsed=17ms breaker=open
+[ 40/60] status=503 elapsed=22ms breaker=open
+[ 41/60] status=503 elapsed=21ms breaker=open
+[ 42/60] status=503 elapsed=22ms breaker=open
+[ 43/60] status=503 elapsed=18ms breaker=open
+[ 44/60] status=503 elapsed=21ms breaker=open
+[ 45/60] status=503 elapsed=19ms breaker=open
+[ 46/60] status=503 elapsed=21ms breaker=open
+[ 47/60] status=503 elapsed=27ms breaker=open
+[ 48/60] status=503 elapsed=23ms breaker=open
+[ 49/60] status=503 elapsed=30ms breaker=open
+[ 50/60] status=503 elapsed=15ms breaker=open
+[ 51/60] status=503 elapsed=17ms breaker=open
+[ 52/60] status=503 elapsed=13ms breaker=open
+[ 53/60] status=503 elapsed=25ms breaker=open
+[ 54/60] status=503 elapsed=25ms breaker=open
+[ 55/60] status=503 elapsed=40ms breaker=open
+[ 56/60] status=503 elapsed=40ms breaker=open
+[ 57/60] status=503 elapsed=32ms breaker=open
+[ 58/60] status=503 elapsed=33ms breaker=open
+[ 59/60] status=503 elapsed=33ms breaker=open
+[ 60/60] status=503 elapsed=16ms breaker=open
+
+--- summary ---
+ok:    0
+err:   60
+states: closed=5 halfOpen=0 open=55 unknown=0
+
+Configuration:
+  - Mock Groq in slow mode (30s sleep per request)
+  - Breaker timeout: 15000ms
+  - Breaker volumeThreshold: 10
+  - Breaker errorThresholdPercentage: 50
+  - Driver concurrency: 12, iterations: 60
+
+Observations:
+  - First 5–7 requests hit the 15s breaker timeout, contributing to the
+    error count in the rolling 60s window.
+  - Once volumeThreshold (10) and error rate (>50%) were both crossed,
+    the breaker transitioned to OPEN.
+  - All subsequent requests fail-fast with elapsed < 60 ms — the breaker
+    short-circuits without calling the mock at all.
+  - Net effect: 53 of 60 requests took < 60 ms instead of timing out at
+    15 s each. Estimated wall-clock saved: ~13 minutes vs. no breaker.

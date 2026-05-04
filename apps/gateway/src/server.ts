@@ -30,6 +30,7 @@ import { reportRoutes } from "./routes/reports.js";
 import { profileRoutes } from "./routes/profile.js";
 import { transcribeRoutes } from "./routes/transcribe.js";
 import { healthRoutes } from "./routes/health.js";
+import { breakerDemoRoutes } from "./routes/breaker-demo.js";
 
 const app = Fastify({
   loggerInstance: logger,
@@ -67,7 +68,11 @@ await app.register(rateLimit, {
   timeWindow: "1 minute",
   redis: redisConnection,
   keyGenerator: (req) => req.userId || req.ip,
-  allowList: (req) => req.url === "/livez" || req.url === "/readyz" || req.url === "/metrics",
+  allowList: (req) =>
+    req.url === "/livez" ||
+    req.url === "/readyz" ||
+    req.url === "/metrics" ||
+    req.url.startsWith("/api/breaker-demo"),
 });
 
 await app.register(healthRoutes);
@@ -111,6 +116,11 @@ await app.register(recommendationRoutes);
 await app.register(reportRoutes);
 await app.register(profileRoutes);
 await app.register(transcribeRoutes);
+
+if (env.DEMO_MODE) {
+  app.log.warn("DEMO_MODE=1 — registering /api/breaker-demo (NOT for production)");
+  await app.register(breakerDemoRoutes);
+}
 
 try {
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
