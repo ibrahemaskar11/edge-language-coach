@@ -1,0 +1,36 @@
+# dependencies
+**/node_modules
+.pnpm-store
+
+# build output
+**/dist
+**/.turbo
+**/.next
+**/build
+
+# version control
+.git
+.gitignore
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# editor / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# tests
+coverage
+
+# misc
+*.md
+!README.md
