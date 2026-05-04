@@ -26,6 +26,11 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm db:generate
+        env:
+          # prisma.config.ts reads DIRECT_URL at config-load time. `prisma generate`
+          # never opens a connection, so a placeholder URL is sufficient for CI.
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
 
       - name: Typecheck all packages
         run: pnpm turbo typecheck
