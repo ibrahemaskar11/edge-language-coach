@@ -7,6 +7,21 @@ import type {
   ChatCompletionCreateParamsNonStreaming,
 } from "groq-sdk/resources/chat/completions";
 import { env } from "../env.js";
+import { groqRequestDuration } from "../lib/metrics.js";
+
+function observeGroq<T>(operation: "chat" | "transcribe", fn: () => Promise<T>): Promise<T> {
+  const end = groqRequestDuration.startTimer({ operation });
+  return fn().then(
+    (result) => {
+      end({ status: "success" });
+      return result;
+    },
+    (err) => {
+      end({ status: "error" });
+      throw err;
+    },
+  );
+}
 
 type ChatArgs = ChatCompletionCreateParamsNonStreaming;
 type ChatResult = ChatCompletion;
@@ -26,10 +41,17 @@ declare module "fastify" {
 }
 
 export const groqPlugin = fp(async (fastify: FastifyInstance) => {
-  const groq = new Groq({ apiKey: env.GROQ_API_KEY });
+  const groq = new Groq({
+    apiKey: env.GROQ_API_KEY,
+    ...(env.GROQ_BASE_URL ? { baseURL: env.GROQ_BASE_URL } : {}),
+  });
+
+  if (env.GROQ_BASE_URL) {
+    fastify.log.warn({ baseURL: env.GROQ_BASE_URL }, "Groq SDK pointed at non-default baseURL (mock?)");
+  }
 
   const chatBreaker = new CircuitBreaker<[ChatArgs], ChatResult>(
-    (args) => groq.chat.completions.create(args) as Promise<ChatResult>,
+    (args) => observeGroq("chat", () => groq.chat.completions.create(args) as Promise<ChatResult>),
     {
       name: "groq-chat",
       timeout: 15_000,
@@ -42,7 +64,7 @@ export const groqPlugin = fp(async (fastify: FastifyInstance) => {
 
   // Whisper transcription tolerates longer responses (audio decode + inference)
   const transcribeBreaker = new CircuitBreaker<[TranscribeArgs], TranscribeResult>(
-    (args) => groq.audio.transcriptions.create(args) as Promise<TranscribeResult>,
+    (args) => observeGroq("transcribe", () => groq.audio.transcriptions.create(args) as Promise<TranscribeResult>),
     {
       name: "groq-transcribe",
       timeout: 60_000,

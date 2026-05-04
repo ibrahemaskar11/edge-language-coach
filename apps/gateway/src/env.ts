@@ -13,6 +13,7 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   SUPABASE_JWT_SECRET: z.string().min(1).optional(),
   GROQ_API_KEY: z.string().min(1).optional(),
+  GROQ_BASE_URL: z.string().url().optional(),
   REDIS_URL: z.string().default("redis://localhost:6379"),
 });
 

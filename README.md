@@ -52,6 +52,9 @@ Edit `.env` and fill in your credentials:
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
 | `SUPABASE_JWT_SECRET` | Supabase JWT secret |
 | `DATABASE_URL` | Postgres connection string from Supabase |
+| `DIRECT_URL` | Same as `DATABASE_URL` for Prisma direct connections |
+| `VITE_SUPABASE_URL` | Same as `SUPABASE_URL`, exposed to the frontend |
+| `VITE_SUPABASE_ANON_KEY` | Same as `SUPABASE_ANON_KEY`, exposed to the frontend |
 | `GROQ_API_KEY` | Groq API key for LLM inference |
 | `PORT` | Gateway port (default: `3001`) |
 
@@ -78,16 +81,101 @@ pnpm dev
 This starts:
 - Redis on `localhost:6379`
 - Gateway on `http://localhost:3001`
-- Workers dashboard on `http://localhost:3002`
+- Workers on `http://localhost:3002` (Bull Board UI at `/queues`)
 - Web app on `http://localhost:5173`
 
-## Running with Docker Compose
-
-To run Redis and the workers service together:
+If you only want Redis up (and prefer to run apps individually):
 
 ```bash
-docker compose up
+docker compose up -d redis
+pnpm --filter @edge/gateway dev
+pnpm --filter @edge/workers dev
+pnpm --filter @edge/web dev
 ```
+
+## Running the full stack with Docker Compose
+
+`docker-compose.yml` brings up Redis, workers, gateway (behind nginx-lb), web, Prometheus, and Grafana:
+
+```bash
+docker compose up -d
+```
+
+| Service | URL | Notes |
+|---|---|---|
+| Web app | http://localhost | Static build served by nginx |
+| Gateway | http://localhost:3001 | Behind nginx-lb (round-robin across replicas) |
+| Workers / Bull Board | http://localhost:3002/queues | Queue inspection UI |
+| Prometheus | http://localhost:9090 | Scrapes gateway + workers `/metrics` |
+| Grafana | http://localhost:3000 | Default login: `admin` / `admin`. Edge Coach dashboard auto-loaded |
+
+### Horizontal scale-out demo
+
+Spin up multiple gateway replicas behind nginx — used for the load-test scenarios:
+
+```bash
+docker compose up -d --scale gateway=3
+```
+
+Workers can be scaled the same way (`--scale workers=2`) — BullMQ natively supports multiple consumers on each queue.
+
+### Health and observability endpoints
+
+| Endpoint | Service | Purpose |
+|---|---|---|
+| `GET /livez` | gateway, workers | Process is alive |
+| `GET /readyz` | gateway, workers | Dependencies (Redis, Supabase, Groq) reachable |
+| `GET /metrics` | gateway, workers | Prometheus scrape target |
+
+## Load testing
+
+A k6 script with three scenarios (baseline, stressed, scaled-out) lives at [`load/gateway.js`](load/gateway.js):
+
+```bash
+k6 run -e GATEWAY_URL=http://localhost:3001 load/gateway.js
+```
+
+## Circuit breaker demo (mock Groq)
+
+A controllable mock Groq server at [`mocks/groq-mock.mjs`](mocks/groq-mock.mjs) lets you trigger the circuit breaker live without real API calls. Useful for course demos and screen recordings.
+
+**1. Start the mock and point the gateway at it**
+
+```bash
+# terminal 1 — mock on :8080
+pnpm mock:groq
+
+# .env — add this line and restart the gateway
+GROQ_BASE_URL=http://localhost:8080
+```
+
+**2. Toggle modes on demand**
+
+```bash
+# normal (fast 200 responses) — default
+curl -X POST http://localhost:8080/admin/mode \
+  -H "content-type: application/json" \
+  -d '{"mode":"normal"}'
+
+# slow (sleep 30s — exceeds the 15s breaker timeout)
+curl -X POST http://localhost:8080/admin/mode \
+  -H "content-type: application/json" \
+  -d '{"mode":"slow"}'
+
+# error (immediate HTTP 500)
+curl -X POST http://localhost:8080/admin/mode \
+  -H "content-type: application/json" \
+  -d '{"mode":"error"}'
+```
+
+**3. Demo flow**
+
+1. Mode = `normal` → send traffic via k6 → breaker closed, p95 healthy.
+2. Switch to `slow` → run k6 again → ~10 requests time out → `groq_circuit_breaker_state{breaker="chat"}` flips to `1` (open) in Grafana.
+3. Subsequent requests fail-fast with 503 instead of hanging — visible in `http_request_duration_seconds`.
+4. Wait 30s (`resetTimeout`) → breaker goes half-open. Switch mock back to `normal` → breaker closes.
+
+The `volumeThreshold: 10` in [groq.ts](apps/gateway/src/plugins/groq.ts) means you need at least 10 requests in the rolling window before the breaker can trip — k6 hitting `/messages` is the easiest way to drive that volume.
 
 ## Building for Production
 

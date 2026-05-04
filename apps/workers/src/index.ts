@@ -8,13 +8,39 @@ import { createSummaryWorker } from "./workers/summary.worker.js";
 import { createScraperWorker } from "./workers/scraper.worker.js";
 import { logger } from "./lib/logger.js";
 import { defaultWorkerOptions } from "./lib/queues.js";
+import {
+  register,
+  jobDuration,
+  jobsDeadLetterTotal,
+  queueDepth,
+} from "./lib/metrics.js";
 
 const MAX_ATTEMPTS = defaultWorkerOptions.attempts;
 
-function attachDlqListener(worker: ReturnType<typeof createFlashcardWorker>, queueName: string) {
+function jobElapsedSeconds(job: { processedOn?: number; finishedOn?: number }): number | null {
+  if (!job.processedOn) return null;
+  const end = job.finishedOn ?? Date.now();
+  return (end - job.processedOn) / 1000;
+}
+
+function attachJobMetrics(worker: ReturnType<typeof createFlashcardWorker>, queueName: string) {
+  worker.on("completed", (job) => {
+    const elapsed = jobElapsedSeconds(job);
+    if (elapsed !== null) {
+      jobDuration.observe({ queue: queueName, status: "completed" }, elapsed);
+    }
+  });
+
   worker.on("failed", (job, err) => {
     if (!job) return;
     const isDlq = (job.attemptsMade ?? 0) >= MAX_ATTEMPTS;
+    if (isDlq) {
+      jobsDeadLetterTotal.inc({ queue: queueName });
+      const elapsed = jobElapsedSeconds(job);
+      if (elapsed !== null) {
+        jobDuration.observe({ queue: queueName, status: "failed" }, elapsed);
+      }
+    }
     const level = isDlq ? "error" : "warn";
     logger[level](
       {
@@ -38,9 +64,9 @@ const workers = {
   scraper: createScraperWorker(),
 };
 
-attachDlqListener(workers.flashcard, "flashcard-generate");
-attachDlqListener(workers.summary,   "summary-generate");
-attachDlqListener(workers.scraper,   "topic-scrape");
+attachJobMetrics(workers.flashcard, "flashcard-generate");
+attachJobMetrics(workers.summary,   "summary-generate");
+attachJobMetrics(workers.scraper,   "topic-scrape");
 
 // Bull Board monitoring UI
 const serverAdapter = new ExpressAdapter();
@@ -78,6 +104,23 @@ async function checkRedis(): Promise<{ ok: true } | { ok: false; error: string }
 
 app.get("/livez", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+app.get("/metrics", async (_req, res) => {
+  try {
+    const [fcWaiting, sumWaiting, scrapeWaiting] = await Promise.all([
+      flashcardQueue.getWaitingCount(),
+      summaryQueue.getWaitingCount(),
+      scraperQueue.getWaitingCount(),
+    ]);
+    queueDepth.set({ queue: "flashcard-generate" }, fcWaiting);
+    queueDepth.set({ queue: "summary-generate" }, sumWaiting);
+    queueDepth.set({ queue: "topic-scrape" }, scrapeWaiting);
+  } catch (err) {
+    logger.warn({ err: { message: (err as Error).message } }, "failed to refresh queue depth");
+  }
+  res.set("Content-Type", register.contentType);
+  res.send(await register.metrics());
 });
 
 app.get("/readyz", async (_req, res) => {

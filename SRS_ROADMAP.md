@@ -333,3 +333,31 @@ If you want everything on one provider:
 - **Days 12–14**: Step 9 (report + ADRs), polish
 
 Step 10 slots in wherever time permits.
+
+---
+
+## Progress tracker
+
+Last updated: 2026-05-04.
+
+| # | Step | Status | Evidence / gaps |
+|---|------|--------|-----------------|
+| 1 | Structured logging + `/livez` `/readyz` | ✅ Done | commit `85f3e2f` — [health.ts](apps/gateway/src/routes/health.ts), [workers/index.ts](apps/workers/src/index.ts) |
+| 2 | Timeouts + circuit breaker + rate limit | ✅ Done | commit `45d4835` — opossum in [groq.ts](apps/gateway/src/plugins/groq.ts), `@fastify/rate-limit` in [server.ts](apps/gateway/src/server.ts) |
+| 3 | Queue hardening (retries, DLQ, idempotency) | ✅ Done | BullMQ retry/backoff + DLQ listener; scraper Redis idempotency key |
+| 4 | Containerize gateway/web/workers | ✅ Done | Dockerfiles for all three + unified [docker-compose.yml](docker-compose.yml) |
+| 5a | Prometheus metrics | ✅ Done | Gateway + workers both expose `/metrics`. Histograms: `http_request_duration_seconds`, `groq_request_duration_seconds`, `bullmq_job_duration_seconds`. Counters: `jobs_dead_letter_total`. Gauges: `groq_circuit_breaker_state`, `queue_depth_total`, `active_sessions_total` |
+| 5b | OpenTelemetry traces | ❌ Skipped | Traded away in [ADR-004](docs/adr/004-prom-client-over-full-otel.md). Roadmap called for gateway → worker → Groq trace |
+| 5c | Grafana backend | 🔁 Substituted | Local Grafana via compose instead of Grafana Cloud — call out in report |
+| 6 | Scale-out demo | ✅ Done | nginx-lb + `docker compose up --scale gateway=N` |
+| 7 | k6 load test (3 scenarios) | ✅ Done | [load/gateway.js](load/gateway.js) |
+| 8 | CI/CD | ✅ Done | [ci.yml](.github/workflows/ci.yml) — typecheck/build + GHCR push on `main` |
+| 9 | Architecture report + ADRs | ✅ Done | 4 ADRs, [architecture-report.md](docs/architecture-report.md), [c4-diagram.md](docs/c4-diagram.md), [slo-table.md](docs/slo-table.md) |
+| 10 | Contract/integration tests | ❌ Not done | Roadmap-optional |
+
+**Legend:** ✅ done · 🔁 substituted with documented trade-off · ❌ not done
+
+### Open gaps to decide on before submission
+
+1. **OpenTelemetry traces** — ADR-004 documents the trade-off. Defensible, but the roadmap framed tracing as a major grade lift. Worth confirming the grader accepts metrics-only observability before relying on this.
+2. **Step 10 tests** — optional, skipping is fine.

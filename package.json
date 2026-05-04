@@ -8,7 +8,8 @@
     "typecheck": "turbo typecheck",
     "db:generate": "turbo db:generate",
     "db:push": "turbo db:push",
-    "db:seed": "turbo db:seed"
+    "db:seed": "turbo db:seed",
+    "mock:groq": "node mocks/groq-mock.mjs"
   },
   "devDependencies": {
     "turbo": "^2",

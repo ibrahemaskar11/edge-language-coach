@@ -32,6 +32,14 @@ export const groqCircuitBreakerState = new Gauge({
   registers: [register],
 });
 
+export const groqRequestDuration = new Histogram({
+  name: "groq_request_duration_seconds",
+  help: "Groq API request duration in seconds (gateway-side, includes circuit breaker overhead)",
+  labelNames: ["operation", "status"],
+  buckets: [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60],
+  registers: [register],
+});
+
 export const queueDepth = new Gauge({
   name: "queue_depth_total",
   help: "Number of waiting jobs per BullMQ queue",
