@@ -9,7 +9,9 @@
     "db:generate": "turbo db:generate",
     "db:push": "turbo db:push",
     "db:seed": "turbo db:seed",
-    "mock:groq": "node mocks/groq-mock.mjs"
+    "mock:groq": "node mocks/groq-mock.mjs",
+    "docs:pdf": "node scripts/build-docs.mjs",
+    "docs:pdf:short": "node scripts/build-docs-short.mjs"
   },
   "devDependencies": {
     "turbo": "^2",

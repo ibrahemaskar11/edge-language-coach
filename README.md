@@ -57,6 +57,8 @@ Edit `.env` and fill in your credentials:
 | `VITE_SUPABASE_ANON_KEY` | Same as `SUPABASE_ANON_KEY`, exposed to the frontend |
 | `GROQ_API_KEY` | Groq API key for LLM inference |
 | `PORT` | Gateway port (default: `3001`) |
+| `GROQ_BASE_URL` | *Optional.* Override Groq SDK base URL (used by the circuit-breaker demo). Leave commented out for normal operation |
+| `DEMO_MODE` | *Optional.* Set to `1` to expose `/api/breaker-demo/chat` (no auth, no rate-limit). Demo only — not for production |
 
 **4. Push the database schema**
 
@@ -191,7 +193,7 @@ node mocks/breaker-driver.mjs
 
 You'll see the breaker state column transition `closed` → `open` after ~10–15 requests (the `volumeThreshold` in [groq.ts](apps/gateway/src/plugins/groq.ts)). At the same time `groq_circuit_breaker_state{breaker="chat"}` flips to `1` in Grafana.
 
-**4. Reset**
+**4. Reset (during the demo)**
 
 Switch the mock back to `normal`; after 30s (`resetTimeout`) the breaker goes half-open and a successful probe closes it.
 
@@ -199,11 +201,42 @@ Switch the mock back to `normal`; after 30s (`resetTimeout`) the breaker goes ha
 curl -X POST http://localhost:8080/admin/mode -H "content-type: application/json" -d "{\"mode\":\"normal\"}"
 ```
 
+**5. Return to normal operation (after the demo)**
+
+> **Important:** while `GROQ_BASE_URL` and `DEMO_MODE` are active, **all real app traffic** also routes through the mock — chat messages and `/api/transcribe` will fail. Comment both lines back out in `.env` once you're done, then rebuild the gateway so the new env is picked up:
+
+```cmd
+:: edit .env — comment out the demo lines
+:: # GROQ_BASE_URL=...
+:: # DEMO_MODE=1
+
+docker compose up -d --build gateway
+```
+
+`--build` (not just `--force-recreate`) is required because the gateway image bakes the source at build time — recreating without rebuilding will keep using the previous image.
+
 ## Building for Production
 
 ```bash
 pnpm build
 ```
+
+## Building the architecture report PDF
+
+Two flavours are available:
+
+| Command | Output | Contents |
+|---|---|---|
+| `pnpm docs:pdf:short` | `docs/edge-language-coach-report-short.pdf` | Single ~5-page self-contained report ([docs/report.md](docs/report.md)). Recommended for submission |
+| `pnpm docs:pdf` | `docs/edge-language-coach-report.pdf` | Full bundle: long architecture report + C4 diagrams + SLO table + 4 ADRs |
+
+Prerequisites (one-time install on Windows):
+```powershell
+winget install JohnMacFarlane.Pandoc
+winget install MiKTeX.MiKTeX
+```
+
+The first compile after installing MiKTeX may take a minute while it auto-fetches the LaTeX packages it needs.
 
 ## Troubleshooting
 
@@ -222,6 +255,19 @@ docker compose up -d --pull missing
 
 **Slow `exporting layers` step on Windows**
 Normal — Docker Desktop on Windows is bottlenecked by the shared Linux VM filesystem when committing the workers image (~500 MB of node_modules). Wait it out; don't Ctrl-C.
+
+**Gateway in restart loop after editing source code**
+You probably ran `docker compose up -d --force-recreate gateway` instead of `--build`. The gateway Dockerfile copies source at build time, so a recreate without rebuild reuses the old code. Force a fresh build:
+```bash
+docker compose up -d --build gateway
+```
+If `--build` alone doesn't pick up the change (BuildKit can serve a stale cached layer), use `--no-cache`:
+```bash
+docker compose build --no-cache gateway && docker compose up -d gateway
+```
+
+**`502 Bad Gateway` from `/api/transcribe` or `/api/messages`**
+Check whether `GROQ_BASE_URL` or `DEMO_MODE` is uncommented in `.env`. If yes, real app traffic is being routed through the mock Groq server — comment both out and rebuild the gateway (see above).
 
 ## Tech Stack
 
