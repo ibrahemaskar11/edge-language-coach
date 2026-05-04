@@ -183,6 +183,24 @@ The `volumeThreshold: 10` in [groq.ts](apps/gateway/src/plugins/groq.ts) means y
 pnpm build
 ```
 
+## Troubleshooting
+
+**`pnpm: not found` during Docker build**
+The Dockerfiles install pnpm via `npm install -g pnpm@10.18.3` and verify it with `pnpm --version`. If you see this error, you're hitting a stale BuildKit cache. Wipe and rebuild:
+```bash
+docker builder prune -af
+docker compose build --no-cache --progress=plain
+```
+
+**`No such image: redis:7-alpine`**
+A previous `docker system prune` removed it. Pull explicitly or let compose do it:
+```bash
+docker compose up -d --pull missing
+```
+
+**Slow `exporting layers` step on Windows**
+Normal — Docker Desktop on Windows is bottlenecked by the shared Linux VM filesystem when committing the workers image (~500 MB of node_modules). Wait it out; don't Ctrl-C.
+
 ## Tech Stack
 
 | Layer | Technology |
