@@ -99,7 +99,7 @@ server.tool(
 
 server.tool(
   "get_active_sessions",
-  "Get the number of currently active (in-progress) learning sessions",
+  "Get the number of currently active learning sessions (status=coaching)",
   {},
   async () => {
     const text = await fetch(`${GATEWAY_URL}/metrics`).then((r) => r.text());

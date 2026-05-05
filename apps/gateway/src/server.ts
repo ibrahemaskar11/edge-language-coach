@@ -100,7 +100,7 @@ app.get("/metrics", async (_req, reply) => {
   const { count } = await app.supabase
     .from("sessions")
     .select("id", { head: true, count: "exact" })
-    .eq("status", "active");
+    .eq("status", "coaching");
   activeSessionsGauge.set(count ?? 0);
 
   reply.header("Content-Type", register.contentType);
