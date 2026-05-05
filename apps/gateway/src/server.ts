@@ -31,6 +31,7 @@ import { profileRoutes } from "./routes/profile.js";
 import { transcribeRoutes } from "./routes/transcribe.js";
 import { healthRoutes } from "./routes/health.js";
 import { breakerDemoRoutes } from "./routes/breaker-demo.js";
+import { adminRoutes } from "./routes/admin.js";
 
 const app = Fastify({
   loggerInstance: logger,
@@ -72,7 +73,8 @@ await app.register(rateLimit, {
     req.url === "/livez" ||
     req.url === "/readyz" ||
     req.url === "/metrics" ||
-    req.url.startsWith("/api/breaker-demo"),
+    req.url.startsWith("/api/breaker-demo") ||
+    req.url.startsWith("/admin"),
 });
 
 await app.register(healthRoutes);
@@ -116,6 +118,8 @@ await app.register(recommendationRoutes);
 await app.register(reportRoutes);
 await app.register(profileRoutes);
 await app.register(transcribeRoutes);
+
+await app.register(adminRoutes);
 
 if (env.DEMO_MODE) {
   app.log.warn("DEMO_MODE=1 — registering /api/breaker-demo (NOT for production)");

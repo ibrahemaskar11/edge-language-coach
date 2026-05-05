@@ -189,10 +189,19 @@ export async function messageRoutes(fastify: FastifyInstance) {
         const raw = completion.choices[0]?.message?.content ?? "{}";
         llmResponse = llmCoachResponseSchema.parse(JSON.parse(raw));
       } catch (err) {
-        const isOpen = (err as Error & { code?: string }).code === "EOPENBREAKER";
-        fastify.log.error({ err, breakerOpen: isOpen }, "Groq chat call failed");
+        const e = err as { code?: string; status?: number; headers?: Record<string, string> };
+        const isOpen = e.code === "EOPENBREAKER";
+        const isRateLimited = e.status === 429;
+        fastify.log.warn({ err, breakerOpen: isOpen, rateLimited: isRateLimited }, "Groq chat call failed");
+        if (isRateLimited) {
+          const retryAfter = Number(e.headers?.["retry-after"]) || 60;
+          return reply
+            .status(429)
+            .header("Retry-After", String(retryAfter))
+            .send({ message: "The AI coach is busy right now. Please wait a moment and try again.", retryAfter });
+        }
         return reply.status(503).send({
-          message: isOpen ? "AI service temporarily unavailable" : "AI service error",
+          message: isOpen ? "AI service temporarily unavailable. Please try again in 30 seconds." : "AI service error.",
         });
       }
 

@@ -14,7 +14,18 @@ export function createFlashcardWorker() {
         sessionId,
         userId,
       });
-      await runFlashcardGeneration(sessionId, userId, log);
+      try {
+        await runFlashcardGeneration(sessionId, userId, log);
+      } catch (err) {
+        const e = err as { status?: number; headers?: Record<string, string> };
+        if (e.status === 429) {
+          const delay = (Number(e.headers?.["retry-after"]) || 60) * 1000;
+          log.warn({ delay }, "Groq rate-limited, delaying job");
+          await job.moveToDelayed(Date.now() + delay, job.token);
+          return;
+        }
+        throw err;
+      }
     },
     { connection, concurrency: 3, ...defaultWorkerOptions }
   );

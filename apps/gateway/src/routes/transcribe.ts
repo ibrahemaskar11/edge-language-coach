@@ -33,10 +33,19 @@ export async function transcribeRoutes(fastify: FastifyInstance) {
         });
         return reply.send({ transcript: result.text });
       } catch (err) {
-        const isOpen = (err as Error & { code?: string }).code === "EOPENBREAKER";
-        fastify.log.error({ err, breakerOpen: isOpen }, "Whisper transcription failed");
+        const e = err as { code?: string; status?: number; headers?: Record<string, string> };
+        const isOpen = e.code === "EOPENBREAKER";
+        const isRateLimited = e.status === 429;
+        fastify.log.warn({ err, breakerOpen: isOpen, rateLimited: isRateLimited }, "Whisper transcription failed");
+        if (isRateLimited) {
+          const retryAfter = Number(e.headers?.["retry-after"]) || 60;
+          return reply
+            .status(429)
+            .header("Retry-After", String(retryAfter))
+            .send({ message: "Transcription is busy right now. Please wait a moment and try again.", retryAfter });
+        }
         return reply.status(503).send({
-          message: isOpen ? "Transcription service temporarily unavailable" : "Transcription service error",
+          message: isOpen ? "Transcription service temporarily unavailable." : "Transcription service error.",
         });
       }
     },

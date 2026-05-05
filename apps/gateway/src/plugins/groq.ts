@@ -50,6 +50,9 @@ export const groqPlugin = fp(async (fastify: FastifyInstance) => {
     fastify.log.warn({ baseURL: env.GROQ_BASE_URL }, "Groq SDK pointed at non-default baseURL (mock?)");
   }
 
+  // 429s mean "slow down", not "broken" — don't count them as breaker failures
+  const isRateLimit = (err: unknown) => (err as { status?: number }).status === 429;
+
   const chatBreaker = new CircuitBreaker<[ChatArgs], ChatResult>(
     (args) => observeGroq("chat", () => groq.chat.completions.create(args) as Promise<ChatResult>),
     {
@@ -59,6 +62,7 @@ export const groqPlugin = fp(async (fastify: FastifyInstance) => {
       resetTimeout: 30_000,
       volumeThreshold: 10,
       rollingCountTimeout: 60_000,
+      errorFilter: isRateLimit,
     },
   );
 
@@ -72,6 +76,7 @@ export const groqPlugin = fp(async (fastify: FastifyInstance) => {
       resetTimeout: 30_000,
       volumeThreshold: 5,
       rollingCountTimeout: 60_000,
+      errorFilter: isRateLimit,
     },
   );
 

@@ -19,6 +19,7 @@ const envSchema = z.object({
   ),
   REDIS_URL: z.string().default("redis://localhost:6379"),
   DEMO_MODE: z.coerce.boolean().default(false),
+  ADMIN_API_KEY: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);
