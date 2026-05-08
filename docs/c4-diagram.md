@@ -50,6 +50,38 @@ graph TB
     grafana -->|"PromQL queries"| prometheus
 ```
 
+## Level 2b — Operator Surface (Agentic MCP)
+
+A separate plane from the user-request data flow. MCP clients (Claude Desktop, Claude Code, automated runbook agents) speak the stdio transport to two servers split by privilege.
+
+```mermaid
+graph LR
+    operator["Operator / Agent\n(Claude Desktop, Claude Code)"]
+
+    obs_mcp["observability-mcp\n[stdio MCP server]\nRead-only:\n• get_service_health\n• get_queue_metrics\n• get_circuit_breaker_state\n• get_active_sessions\n• get_groq_latency"]
+
+    rem_mcp["remediation-mcp\n[stdio MCP server]\nGuarded write:\n• pause_queue / resume_queue\n• reset_circuit_breaker (ADMIN_API_KEY)\n• flush_dead_letter_queue (confirm:true)"]
+
+    gateway["API Gateway\n:3001"]
+    workers["Workers\n:3002"]
+    redis["Redis"]
+    admin["POST /admin/breakers/reset\n(ADMIN_API_KEY-guarded)"]
+    audit["stderr audit log\n(pino, structured)"]
+
+    operator -->|"stdio"| obs_mcp
+    operator -->|"stdio"| rem_mcp
+
+    obs_mcp -->|"GET /metrics, /readyz"| gateway
+    obs_mcp -->|"GET /readyz"| workers
+
+    rem_mcp -->|"BullMQ admin"| redis
+    rem_mcp -->|"x-admin-key"| admin
+    admin --- gateway
+    rem_mcp -.->|"every call"| audit
+```
+
+Loop closure: detect (Prometheus / Grafana, not shown) → diagnose (`observability-mcp`) → remediate (`remediation-mcp`).
+
 ## Level 3 — Gateway Component Diagram
 
 ```mermaid

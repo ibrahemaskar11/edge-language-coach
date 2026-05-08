@@ -1,17 +1,19 @@
 # Edge Language Coach
 
-A language learning platform built as a monorepo with a React frontend, Fastify API gateway, and BullMQ async workers backed by Redis and Supabase.
+A language learning platform built as a monorepo with a React frontend, Fastify API gateway, BullMQ async workers backed by Redis and Supabase, and an agentic MCP operations layer.
 
 ## Architecture
 
 ```
 apps/
-  web/        # React 19 + Vite + TanStack Router (frontend)
-  gateway/    # Fastify REST API (port 3001)
-  workers/    # BullMQ job processors (port 3002)
+  web/                 # React 19 + Vite + TanStack Router (frontend)
+  gateway/             # Fastify REST API (port 3001)
+  workers/             # BullMQ job processors (port 3002)
+  observability-mcp/   # Read-only MCP server — health, queue, breaker, latency
+  remediation-mcp/     # Guarded MCP server — pause/resume queue, reset breaker, flush DLQ
 packages/
-  db/         # Prisma client + schema
-  shared/     # Shared types and utilities
+  db/                  # Prisma client + schema
+  shared/               # Shared types and utilities
 ```
 
 ## Prerequisites
@@ -59,6 +61,8 @@ Edit `.env` and fill in your credentials:
 | `PORT` | Gateway port (default: `3001`) |
 | `GROQ_BASE_URL` | *Optional.* Override Groq SDK base URL (used by the circuit-breaker demo). Leave commented out for normal operation |
 | `DEMO_MODE` | *Optional.* Set to `1` to expose `/api/breaker-demo/chat` (no auth, no rate-limit). Demo only — not for production |
+| `ADMIN_API_KEY` | Secret for `POST /admin/breakers/reset`, used by `remediation-mcp` to force-close the Groq breakers. Generate with `openssl rand -hex 32` |
+| `GATEWAY_URL` / `WORKERS_URL` | *Optional.* Override targets for the MCP servers (default `http://localhost:3001` / `:3002`) |
 
 **4. Push the database schema**
 
@@ -215,6 +219,67 @@ docker compose up -d --build gateway
 
 `--build` (not just `--force-recreate`) is required because the gateway image bakes the source at build time — recreating without rebuilding will keep using the previous image.
 
+## Operator surface — MCP servers
+
+Two [Model Context Protocol](https://modelcontextprotocol.io) servers expose the running system to agent-driven inspection and remediation. They speak the MCP stdio transport, so any MCP client (Claude Desktop, Claude Code, etc.) can connect.
+
+### `observability-mcp` — read-only
+
+Wraps the Prometheus `/metrics` and `/readyz` endpoints with five typed tools:
+
+| Tool | Returns |
+|---|---|
+| `get_service_health` | `/readyz` body for gateway and workers |
+| `get_queue_metrics` | Waiting job counts per BullMQ queue |
+| `get_circuit_breaker_state` | Groq breaker state for `chat` and `transcribe` (closed / open / half-open) |
+| `get_active_sessions` | Current count of `status=coaching` sessions |
+| `get_groq_latency` | Raw `groq_request_duration_seconds` histogram lines |
+
+### `remediation-mcp` — guarded write
+
+Mutates runtime state with three layers of guard (typed enum, admin key, irreversibility confirm):
+
+| Tool | Mechanism | Guard |
+|---|---|---|
+| `pause_queue` / `resume_queue` | BullMQ queue admin via Redis | Queue name restricted to `flashcard-generate \| summary-generate` (zod enum) |
+| `reset_circuit_breaker` | `POST /admin/breakers/reset` | Requires `ADMIN_API_KEY` HTTP header |
+| `flush_dead_letter_queue` | `Queue.clean('failed')` | Requires `confirm: true` argument (irreversible) |
+
+Every invocation writes a structured `pino` audit line to **stderr** (`stdout` is reserved for the MCP transport). See [apps/remediation-mcp/src/index.ts:24-26](apps/remediation-mcp/src/index.ts#L24-L26).
+
+### Running the servers
+
+```bash
+# in dev (watches and restarts on edit)
+pnpm --filter @edge/observability-mcp dev
+pnpm --filter @edge/remediation-mcp dev
+
+# or as compiled binaries
+pnpm --filter @edge/observability-mcp build && pnpm --filter @edge/observability-mcp start
+pnpm --filter @edge/remediation-mcp build  && pnpm --filter @edge/remediation-mcp  start
+```
+
+Wire into an MCP client (e.g. `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "edge-observability": {
+      "command": "node",
+      "args": ["d:/hassan-work/repos/edge-language-coach/apps/observability-mcp/dist/index.js"]
+    },
+    "edge-remediation": {
+      "command": "node",
+      "args": ["d:/hassan-work/repos/edge-language-coach/apps/remediation-mcp/dist/index.js"]
+    }
+  }
+}
+```
+
+### How it closes the operator loop
+
+`detect` (Grafana / Prometheus alert) → `diagnose` (`observability-mcp.get_circuit_breaker_state` + `get_groq_latency`) → `remediate` (`remediation-mcp.reset_circuit_breaker` once Groq is healthy, or `pause_queue` to drain a poisoned worker) → audit trail in stderr.
+
 ## Building for Production
 
 ```bash
@@ -279,4 +344,5 @@ Check whether `GROQ_BASE_URL` or `DEMO_MODE` is uncommented in `.env`. If yes, r
 | Database | Supabase (Postgres), Prisma |
 | Cache / Queue | Redis 7 |
 | AI Inference | Groq SDK |
+| Operator Surface | `@modelcontextprotocol/sdk` (stdio transport) |
 | Monorepo | Turborepo, pnpm workspaces |

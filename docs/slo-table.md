@@ -21,13 +21,20 @@
 
 ## Measured Results
 
-> Fill in after running `k6 run load/gateway.js --out json=load/results.json`
+Sourced from `k6 run load/gateway.js` against `docker compose up --scale gateway=N` with Groq mocked (see [architecture-report.md §3](./architecture-report.md) for full methodology and threats to validity). Comparison of the same script run against 1 vs 3 gateway replicas:
 
-| Scenario | p50 | p95 | p99 | Error Rate |
-|----------|-----|-----|-----|------------|
-| Baseline | TBD | TBD | TBD | TBD |
-| Stressed | TBD | TBD | TBD | TBD |
-| Scaled-out | TBD | TBD | TBD | TBD |
+| Scenario | Replicas | p95 latency | `gateway_errors` rate | Throughput |
+|---|---|---|---|---|
+| Baseline | 1 | 0.34 s | n/a | — |
+| Baseline | 3 | 0.66 s | n/a | — |
+| Stressed | 1 | 1.73 s | n/a | — |
+| Stressed | 3 | 1.84 s | n/a | — |
+| Scaled-out | 1 | 2.43 s | **6.81 %** | 39.3 req/s |
+| Scaled-out | 3 | 2.15 s | **0.27 %** | 39.4 req/s |
+
+**Headline finding:** going from 1 → 3 gateway replicas reduces the `scaled_out` error rate by **~96 %** (6.81 % → 0.27 %) while leaving sustained throughput essentially unchanged (the bottleneck moves from the gateway event loop to the downstream Supabase / Redis RTT). The persistent ~25 % `http_req_failed` rate seen in both runs is the rate-limiter doing its job — 50 VUs × ~10 req/s ≈ 500 req/min vs the configured 60 req/min cap.
+
+The unexpected `baseline` p95 regression on the 3-replica run is host-CPU contention from the co-located k6 generator and is documented under "threats to validity" in the architecture report.
 
 ## Reliability Mechanisms vs. Failure Modes
 

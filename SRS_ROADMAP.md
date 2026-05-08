@@ -338,7 +338,7 @@ Step 10 slots in wherever time permits.
 
 ## Progress tracker
 
-Last updated: 2026-05-04.
+Last updated: 2026-05-08.
 
 | # | Step | Status | Evidence / gaps |
 |---|------|--------|-----------------|
@@ -354,10 +354,11 @@ Last updated: 2026-05-04.
 | 8 | CI/CD | ✅ Done | [ci.yml](.github/workflows/ci.yml) — typecheck/build + GHCR push on `main` |
 | 9 | Architecture report + ADRs | ✅ Done | 4 ADRs, [architecture-report.md](docs/architecture-report.md), [c4-diagram.md](docs/c4-diagram.md), [slo-table.md](docs/slo-table.md) |
 | 10 | Contract/integration tests | ❌ Not done | Roadmap-optional |
+| 11 | Agentic MCP operations layer (extra) | ✅ Done | commit `bc95c86` — [observability-mcp](apps/observability-mcp/src/index.ts) (5 read tools) + [remediation-mcp](apps/remediation-mcp/src/index.ts) (4 guarded write tools with audit log + `confirm:true` + `ADMIN_API_KEY`). Closes the detect → diagnose → remediate loop |
 
 **Legend:** ✅ done · 🔁 substituted with documented trade-off · ❌ not done
 
 ### Open gaps to decide on before submission
 
-1. **OpenTelemetry traces** — ADR-004 documents the trade-off. Defensible, but the roadmap framed tracing as a major grade lift. Worth confirming the grader accepts metrics-only observability before relying on this.
+1. **OpenTelemetry traces** — ADR-004 documents the trade-off. Defensible, but the roadmap framed tracing as a major grade lift. The MCP operator surface (#11) gives a programmatic diagnostic path that partially compensates by exposing the existing observability primitives as agent-callable tools — worth highlighting alongside ADR-004 in the report.
 2. **Step 10 tests** — optional, skipping is fine.

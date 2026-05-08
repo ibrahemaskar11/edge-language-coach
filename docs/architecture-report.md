@@ -153,7 +153,50 @@ A pre-provisioned dashboard (`docker/grafana/dashboards/edge-coach.json`) is loa
 
 ---
 
-## 5. SLO Targets
+## 5. Operator Surface — Agentic MCP
+
+A two-server [Model Context Protocol](https://modelcontextprotocol.io) layer exposes the running system to agent-driven inspection and remediation, **without** SSH, `kubectl`, or a redeploy. This closes the operator loop on top of the observability stack: **detect** (Prometheus / Grafana) → **diagnose** (`observability-mcp`) → **remediate** (`remediation-mcp`).
+
+The two servers are separated by privilege: read-only telemetry on one transport, guarded mutations on a second.
+
+### 5.1 `observability-mcp` (read-only)
+
+Wraps `/metrics` and `/readyz` as five typed tools. No mutation, no auth (stdio transport, locally scoped). Source: [`apps/observability-mcp/src/index.ts`](../apps/observability-mcp/src/index.ts).
+
+| Tool | Backed by |
+|---|---|
+| `get_service_health` | Gateway + workers `/readyz` |
+| `get_queue_metrics` | `queue_depth_total` per queue |
+| `get_circuit_breaker_state` | `groq_circuit_breaker_state{breaker}` |
+| `get_active_sessions` | `active_sessions_total` |
+| `get_groq_latency` | `groq_request_duration_seconds` histogram lines |
+
+### 5.2 `remediation-mcp` (guarded write)
+
+Mutates runtime state through three layered guards. Source: [`apps/remediation-mcp/src/index.ts`](../apps/remediation-mcp/src/index.ts).
+
+| Tool | Mechanism | Guard | Reversible? |
+|---|---|---|---|
+| `pause_queue` / `resume_queue` | BullMQ admin via Redis | `zod.enum` restricts queue name to known queues | yes |
+| `reset_circuit_breaker` | `POST /admin/breakers/reset` ([apps/gateway/src/routes/admin.ts](../apps/gateway/src/routes/admin.ts)) | `ADMIN_API_KEY` HTTP header | yes (breakers may re-open if upstream is still bad) |
+| `flush_dead_letter_queue` | `Queue.clean('failed')` | `confirm: true` argument required | **no** |
+
+Every invocation writes a structured `pino` audit line to **stderr** (`stdout` is reserved for the MCP transport — see [remediation-mcp/src/index.ts:21-26](../apps/remediation-mcp/src/index.ts#L21-L26)).
+
+### 5.3 Why this matters for reliability
+
+Without the MCP layer, recovery from an open breaker, a poisoned DLQ, or a queue that needs to be drained for maintenance requires either a Bull Board click-through, a `redis-cli` session, or a redeploy. With it, the same diagnostic and remediation primitives are exposed as a typed, audited contract that any MCP client can call — Claude Desktop, Claude Code, or a future automated runbook agent.
+
+Concretely: when the breaker demo opens the chat breaker, the recovery sequence becomes a three-tool dialogue:
+1. `observability-mcp.get_circuit_breaker_state` → confirm `chat: open`
+2. (operator verifies upstream Groq is healthy)
+3. `remediation-mcp.reset_circuit_breaker` → forces both breakers closed; audit line on stderr
+
+This partially compensates for the absence of distributed tracing (ADR-004): the operator cannot follow a single span through the system, but they can interrogate live state with structured tools rather than reading raw metrics by hand.
+
+---
+
+## 6. SLO Targets
 
 See `docs/slo-table.md` for the full SLO table including k6 load test targets and measured results.
 
@@ -164,7 +207,7 @@ Key SLOs:
 
 ---
 
-## 6. Trade-offs and Lessons Learned
+## 7. Trade-offs and Lessons Learned
 
 ### Node.js workers over Go microservices
 Chose Node.js for velocity (shared TypeScript types, same toolchain). Trade-off: workers cannot scale independently. See ADR 001.
@@ -181,11 +224,14 @@ Faster to instrument, fewer services. Trade-off: no distributed traces across ga
 ### Stateless gateway design
 Placing all shared state (rate limits, job queues) in Redis made horizontal scale-out trivial — no sticky sessions, no shared memory. The nginx-lb + Redis combination provides elasticity without code changes.
 
+### Agentic MCP operator surface (shipped)
+Originally listed as future work, now shipped as `apps/observability-mcp` and `apps/remediation-mcp`. The split between read-only and guarded-write transports is the load-bearing decision; bundling both into one server would have meant every consumer inherits the privilege of the most-privileged tool.
+
 ---
 
-## 7. Future Work (Post-Course)
+## 8. Future Work (Post-Course)
 
 - OpenTelemetry distributed tracing (gateway ↔ workers correlation)
-- Agentic MCP operations layer: `observability-mcp` (read-only) + `remediation-mcp` (guarded write)
 - Kubernetes deployment manifests (HPA for gateway)
 - Redis AOF persistence enabled for production durability
+- Tighten remediation-mcp auth: `pause_queue` / `resume_queue` currently rely on stdio-locality and the `zod.enum` queue allow-list; production deployment should require `ADMIN_API_KEY` for all mutating tools, not just `reset_circuit_breaker`
