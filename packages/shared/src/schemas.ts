@@ -2,12 +2,21 @@ import { z } from "zod";
 
 // ─── Topic ───────────────────────────────────────────────
 
+export const cefrLevelEnum = z.enum(["A1", "A2", "B1", "B2", "C1", "C2"]);
+export type CefrLevel = z.infer<typeof cefrLevelEnum>;
+
+export const topicCategoryEnum = z.enum([
+  "Politics", "Economy", "Society", "Sports",
+  "Daily Life", "Culture", "Food", "Travel", "Technology",
+]);
+export type TopicCategory = z.infer<typeof topicCategoryEnum>;
+
 export const topicSchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
   description: z.string(),
-  level: z.string(),
-  category: z.string(),
+  level: cefrLevelEnum,
+  category: topicCategoryEnum,
   talkingPoints: z.array(z.string()).optional(),
   createdAt: z.string().datetime(),
 });
@@ -106,10 +115,13 @@ export type CreateFeedbackInput = z.infer<typeof createFeedbackSchema>;
 
 // ─── Flashcards ─────────────────────────────────────────
 
+export const flashcardTypeEnum = z.enum(["VOCABULARY", "GRAMMAR", "TRANSLATE TO ITALIAN"]);
+export type FlashcardType = z.infer<typeof flashcardTypeEnum>;
+
 export const flashcardSchema = z.object({
   id: z.string().uuid(),
   topicId: z.string().uuid(),
-  type: z.string(),
+  type: flashcardTypeEnum,
   front: z.string(),
   back: z.string(),
   createdAt: z.string().datetime(),
