@@ -2,5 +2,15 @@
   "supabase-edge": {
     "type": "http",
     "url": "https://mcp.supabase.com/mcp?project_ref=rtohqbxqksziyzzidups"
+  },
+  "observability": {
+    "type": "stdio",
+    "command": "node",
+    "args": ["apps/observability-mcp/dist/index.js"]
+  },
+  "remediation": {
+    "type": "stdio",
+    "command": "node",
+    "args": ["apps/remediation-mcp/dist/index.js"]
   }
 }

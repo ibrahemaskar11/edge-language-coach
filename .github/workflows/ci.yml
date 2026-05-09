@@ -32,6 +32,9 @@ jobs:
           DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
 
+      - name: Run tests
+        run: pnpm turbo test
+
       - name: Typecheck all packages
         run: pnpm turbo typecheck
 
@@ -78,18 +81,5 @@ jobs:
           file: apps/workers/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository }}/workers:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build & push web
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: apps/web/Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository }}/web:latest
-          build-args: |
-            VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
-            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

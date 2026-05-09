@@ -15,6 +15,9 @@
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
+    "test": {
+      "dependsOn": ["^build"]
+    },
     "db:generate": {
       "cache": false,
       "passThroughEnv": ["DIRECT_URL", "DATABASE_URL"]
