@@ -1,0 +1,41 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  workers:
+    image: ghcr.io/${GHCR_REPO}/workers:latest
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  gateway:
+    image: ghcr.io/${GHCR_REPO}/gateway:latest
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_BASE_URL=${GROQ_BASE_URL:-}
+      - DEMO_MODE=${DEMO_MODE:-}
+      - PORT=3001
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  nginx-lb:
+    image: nginx:alpine
+    volumes:
+      - ./docker/nginx-lb.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "3001:3001"
+    depends_on:
+      - gateway
+    restart: unless-stopped

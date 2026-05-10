@@ -9,15 +9,64 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ─── Enums ───────────────────────────────────────────────
+
+enum SessionStatus {
+  recording
+  transcribing
+  coaching
+  complete
+}
+
+enum MessageRole {
+  ai
+  user
+}
+
+enum FeedbackType {
+  mistakes
+  good_points
+  follow_up
+}
+
+enum FlashcardType {
+  VOCABULARY
+  GRAMMAR
+  TRANSLATE_TO_ITALIAN @map("TRANSLATE TO ITALIAN")
+}
+
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum TopicCategory {
+  Politics
+  Economy
+  Society
+  Sports
+  DailyLife  @map("Daily Life")
+  Culture
+  Food
+  Travel
+  Technology
+}
+
+// ─── Models ──────────────────────────────────────────────
+
 model Profile {
-  id                  String    @id @default(dbgenerated("gen_random_uuid()"))
-  email               String    @unique
-  fullName            String?   @map("full_name")
-  dateOfBirth         DateTime? @db.Date @map("date_of_birth")
-  italianLevel        String?   @map("italian_level")
-  onboardingCompleted Boolean   @default(false) @map("onboarding_completed")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
+  id                  String     @id @default(dbgenerated("gen_random_uuid()"))
+  email               String     @unique
+  fullName            String?    @map("full_name")
+  dateOfBirth         DateTime?  @db.Date @map("date_of_birth")
+  italianLevel        CefrLevel? @map("italian_level")
+  onboardingCompleted Boolean    @default(false) @map("onboarding_completed")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @default(now()) @updatedAt @map("updated_at")
 
   sessions       Session[]
   userTopics     UserTopic[]
@@ -27,14 +76,14 @@ model Profile {
 }
 
 model Topic {
-  id            String   @id @default(dbgenerated("gen_random_uuid()"))
-  title         String   @unique
+  id            String        @id @default(dbgenerated("gen_random_uuid()"))
+  title         String        @unique
   description   String
-  level         String   @default("B2")
-  category      String
-  talkingPoints String[] @default([]) @map("talking_points")
-  isActive      Boolean  @default(true)  @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at")
+  level         CefrLevel     @default(B2)
+  category      TopicCategory
+  talkingPoints String[]      @default([]) @map("talking_points")
+  isActive      Boolean       @default(true) @map("is_active")
+  createdAt     DateTime      @default(now()) @map("created_at")
 
   sessions   Session[]
   flashcards Flashcard[]
@@ -57,12 +106,12 @@ model UserTopic {
 }
 
 model Flashcard {
-  id        String   @id @default(dbgenerated("gen_random_uuid()"))
-  topicId   String   @map("topic_id")
-  type      String
+  id        String        @id @default(dbgenerated("gen_random_uuid()"))
+  topicId   String        @map("topic_id")
+  type      FlashcardType
   front     String
   back      String
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime      @default(now()) @map("created_at")
 
   topic          Topic           @relation(fields: [topicId], references: [id])
   userFlashcards UserFlashcard[]
@@ -88,27 +137,27 @@ model UserFlashcard {
 }
 
 model PlacementQuestion {
-  id        String   @id @default(dbgenerated("gen_random_uuid()"))
-  level     String
+  id        String    @id @default(dbgenerated("gen_random_uuid()"))
+  level     CefrLevel
   question  String
   options   String[]
   answer    Int
-  sortOrder Int      @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at")
+  sortOrder Int       @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   @@unique([level, sortOrder])
   @@map("placement_questions")
 }
 
 model Session {
-  id         String   @id @default(dbgenerated("gen_random_uuid()"))
-  userId     String   @map("user_id")
-  topicId    String   @map("topic_id")
-  audioUrl   String?  @map("audio_url")
+  id         String        @id @default(dbgenerated("gen_random_uuid()"))
+  userId     String        @map("user_id")
+  topicId    String        @map("topic_id")
+  audioUrl   String?       @map("audio_url")
   transcript String?
-  status     String   @default("recording")
+  status     SessionStatus @default(recording)
   summary    Json?
-  createdAt  DateTime @default(now()) @map("created_at")
+  createdAt  DateTime      @default(now()) @map("created_at")
 
   user     Profile    @relation(fields: [userId], references: [id])
   topic    Topic      @relation(fields: [topicId], references: [id])
@@ -119,12 +168,12 @@ model Session {
 }
 
 model Feedback {
-  id        String   @id @default(dbgenerated("gen_random_uuid()"))
-  sessionId String   @map("session_id")
-  type      String
+  id        String       @id @default(dbgenerated("gen_random_uuid()"))
+  sessionId String       @map("session_id")
+  type      FeedbackType
   content   Json
-  turn      Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
+  turn      Int          @default(1)
+  createdAt DateTime     @default(now()) @map("created_at")
 
   session Session @relation(fields: [sessionId], references: [id])
 
@@ -132,12 +181,12 @@ model Feedback {
 }
 
 model Message {
-  id        String   @id @default(dbgenerated("gen_random_uuid()"))
-  sessionId String   @map("session_id")
-  role      String
+  id        String      @id @default(dbgenerated("gen_random_uuid()"))
+  sessionId String      @map("session_id")
+  role      MessageRole
   content   String
-  turn      Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
+  turn      Int         @default(1)
+  createdAt DateTime    @default(now()) @map("created_at")
 
   session Session @relation(fields: [sessionId], references: [id])
 
