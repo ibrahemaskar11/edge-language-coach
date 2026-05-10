@@ -27,8 +27,6 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
         env:
-          # prisma.config.ts reads DIRECT_URL at config-load time. `prisma generate`
-          # never opens a connection, so a placeholder URL is sufficient for CI.
           DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
           DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
 
@@ -40,73 +38,3 @@ jobs:
 
       - name: Build all packages
         run: pnpm turbo build
-
-  docker:
-    name: Build & Push Docker Images
-    runs-on: ubuntu-latest
-    needs: typecheck-build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build & push gateway
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: apps/gateway/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/${{ github.repository }}/gateway:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build & push workers
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: apps/workers/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/${{ github.repository }}/workers:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy:
-    name: Deploy to Oracle Cloud
-    runs-on: ubuntu-latest
-    needs: docker
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
-          GHCR_ACTOR: ${{ github.actor }}
-        with:
-          host: ${{ secrets.ORACLE_HOST }}
-          username: ubuntu
-          key: ${{ secrets.ORACLE_SSH_KEY }}
-          envs: GHCR_TOKEN,GHCR_ACTOR
-          script: |
-            cd ~/edge-language-coach
-            git pull origin main
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            docker image prune -f
