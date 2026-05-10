@@ -13,7 +13,7 @@ apps/
   remediation-mcp/     # Guarded MCP server — pause/resume queue, reset breaker, flush DLQ
 packages/
   db/                  # Prisma client + schema
-  shared/               # Shared types and utilities
+  shared/              # Shared types and utilities
 ```
 
 ## Prerequisites
@@ -141,6 +141,26 @@ A k6 script with three scenarios (baseline, stressed, scaled-out) lives at [`loa
 k6 run -e GATEWAY_URL=http://localhost:3001 load/gateway.js
 ```
 
+To get clean p50/p95/p99 + error-rate numbers per scenario from the JSON output, pipe the result through [`load/parse-results.js`](load/parse-results.js):
+
+```bash
+k6 run --out json=load/results-baseline.json -e GATEWAY_URL=http://localhost:3001 load/gateway.js
+node load/parse-results.js   # reads results-baseline.json / results-stressed.json / results-scaled.json
+```
+
+## Testing
+
+The gateway has integration tests using [Vitest](https://vitest.dev) and Fastify's `inject()` test harness — Redis, Supabase, and Groq are mocked, so tests run hermetically without needing the stack up.
+
+```bash
+pnpm turbo test                  # run every workspace's `test` script
+pnpm --filter @edge/gateway test # gateway only
+```
+
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs `pnpm turbo test` ahead of typecheck and build on every push and pull request, so a regression that breaks `/livez`, `/readyz`, or the dependency-failure paths fails the build.
+
+Currently covered: liveness/readiness probes including the Redis-down and Groq-down failure paths ([`apps/gateway/src/__tests__/health.test.ts`](apps/gateway/src/__tests__/health.test.ts)). Breaker, rate-limit, and queue-retry tests are the natural next additions.
+
 ## Circuit breaker demo (mock Groq)
 
 A controllable mock Groq server at [`mocks/groq-mock.mjs`](mocks/groq-mock.mjs) lets you trigger the circuit breaker live without real API calls. Useful for course demos and screen recordings.
@@ -259,7 +279,9 @@ pnpm --filter @edge/observability-mcp build && pnpm --filter @edge/observability
 pnpm --filter @edge/remediation-mcp build  && pnpm --filter @edge/remediation-mcp  start
 ```
 
-Wire into an MCP client (e.g. `claude_desktop_config.json`):
+**For Claude Code in this repo:** the project ships [`.claude/mcp.json`](.claude/mcp.json) which auto-registers both servers (and a Supabase MCP) — just `pnpm --filter @edge/observability-mcp build && pnpm --filter @edge/remediation-mcp build` once and Claude Code picks them up.
+
+**For Claude Desktop or another client**, drop into the client's MCP config (e.g. `claude_desktop_config.json`):
 
 ```json
 {
@@ -276,6 +298,8 @@ Wire into an MCP client (e.g. `claude_desktop_config.json`):
 }
 ```
 
+(Both servers read `ADMIN_API_KEY`, `GATEWAY_URL`, `WORKERS_URL` from the project `.env` via dotenv, so no `env` block is needed in the MCP config.)
+
 ### How it closes the operator loop
 
 `detect` (Grafana / Prometheus alert) → `diagnose` (`observability-mcp.get_circuit_breaker_state` + `get_groq_latency`) → `remediate` (`remediation-mcp.reset_circuit_breaker` once Groq is healthy, or `pause_queue` to drain a poisoned worker) → audit trail in stderr.
@@ -285,6 +309,28 @@ Wire into an MCP client (e.g. `claude_desktop_config.json`):
 ```bash
 pnpm build
 ```
+
+## Production deployment (Oracle Cloud)
+
+Production runs on a single Oracle Cloud VM via [`docker-compose.prod.yml`](docker-compose.prod.yml). The compose file pulls multi-arch (`linux/amd64` + `linux/arm64`) images from GHCR rather than building locally, so the host doesn't need the source tree present at build time.
+
+The full pipeline is in [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+1. **`typecheck-build`** — install deps, generate Prisma client, run `pnpm turbo test`, then typecheck and build every workspace.
+2. **`docker`** (only on `push` to `main`) — build and push multi-arch images for `gateway` and `workers` to GHCR using `docker/build-push-action`. Cached via GHA cache for fast incremental builds.
+3. **`deploy`** (only on `push` to `main`) — SSH into the Oracle host, `git pull`, `docker login ghcr.io`, `docker compose -f docker-compose.prod.yml pull && up -d --remove-orphans`, then prune dangling images.
+
+Required GitHub secrets:
+
+| Secret | Purpose |
+|---|---|
+| `ORACLE_HOST` | Public IP / DNS of the Oracle VM |
+| `ORACLE_SSH_KEY` | Private key for the `ubuntu` user |
+| `GHCR_READ_TOKEN` | PAT with `read:packages` scope, used by the host to pull from GHCR |
+
+Required env on the host (in a `.env` next to `docker-compose.prod.yml`): `GHCR_REPO`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `GROQ_API_KEY`. Optional: `GROQ_BASE_URL`, `DEMO_MODE`.
+
+The prod compose file deliberately omits Prometheus, Grafana, Bull Board UI, and the web frontend (the SPA is served from a separate Cloudflare Pages / Vercel deploy). Web app + observability stack remain in the dev `docker-compose.yml`.
 
 ## Building the architecture report PDF
 

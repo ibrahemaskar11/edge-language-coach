@@ -62,6 +62,17 @@ Title-level deduplication (exact and prefix match against the last 30 days of to
 - Groq transcribe: 60 s circuit breaker timeout
 - Health probes: 2 s per dependency check (Redis, Supabase, Groq)
 
+### 2.6 Integration tests
+
+The reliability claims in §2.1–§2.5 are not just asserted in prose — they are pinned in CI. The gateway has a Vitest suite ([`apps/gateway/src/__tests__/health.test.ts`](../apps/gateway/src/__tests__/health.test.ts)) using Fastify's `inject()` harness, with Redis, Supabase, and Groq mocked at module boundaries so tests run hermetically. Currently covered:
+
+- `GET /livez` returns 200 unconditionally.
+- `GET /readyz` returns 200 with `{status: "ready"}` when all dependencies are healthy.
+- `GET /readyz` returns 503 with `{deps: {redis: {ok: false}}}` when the Redis ping rejects.
+- `GET /readyz` returns 503 with `{deps: {groq: {ok: false}}}` when the Groq probe rejects.
+
+CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs `pnpm turbo test` ahead of typecheck and build on every push and PR, so a regression in the readiness path or its failure semantics fails the pipeline. Breaker, rate-limit, and queue-retry tests are the natural next additions and would close the rest of the gap.
+
 ---
 
 ## 3. Scalability
@@ -119,6 +130,18 @@ Workers are horizontally scalable as well — BullMQ supports multiple consumers
 | `flashcard-generate` | 3 | Parallelism limited by Groq rate limits |
 | `summary-generate` | 3 | Same |
 | `topic-scrape` | 1 | Scraper is serial to avoid race conditions on dedup state |
+
+### 3.5 Production deployment
+
+The same compose model that demonstrates scale-out locally also runs in production, on a single Oracle Cloud VM via [`docker-compose.prod.yml`](../docker-compose.prod.yml). The prod compose file pulls multi-arch images (`linux/amd64` + `linux/arm64`) from GHCR rather than building on the host, so the deployment surface is image-pull + container-restart, not source build.
+
+The release pipeline ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) is three sequential GitHub Actions jobs:
+
+1. `typecheck-build` — `pnpm install`, `prisma generate`, `pnpm turbo test`, then typecheck + build across all workspaces.
+2. `docker` (only on push to `main`) — `docker buildx` builds and pushes multi-arch images for `gateway` and `workers` to GHCR with a GHA build cache.
+3. `deploy` (only on push to `main`) — SSH into the Oracle host, `git pull`, `docker login ghcr.io`, `docker compose -f docker-compose.prod.yml pull && up -d --remove-orphans`, then prune dangling images.
+
+The prod compose includes Redis, workers, gateway, and `nginx-lb`; it intentionally omits Prometheus/Grafana/Bull Board (separate observability deploy) and the SPA (served from Cloudflare Pages / Vercel from the same `apps/web` build).
 
 ---
 

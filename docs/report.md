@@ -64,6 +64,10 @@ The breaker state is also exposed as a Prometheus gauge (`groq_circuit_breaker_s
 - **Retries:** All BullMQ workers use `attempts: 3, backoff: { type: 'exponential', delay: 5000 }`. After three failed attempts the job is logged at `error` level with `dlq: true` and shows up in the Bull Board UI at `:3002/queues`.
 - **Idempotency:** The scraper sets a Redis key `scraper:slot:<date>:<6h-window>` on success, with TTL = 6 h. A second invocation in the same window is a no-op, so if a worker crashes mid-scrape and the job is replayed, we don't get duplicate topics.
 
+## 2.3 Tests in CI
+
+The reliability story above isn't only asserted in prose — the gateway has a small Vitest suite (Fastify `inject()` harness, Redis / Supabase / Groq mocked at module boundaries) that pins the readiness contract: `/livez` returns 200, `/readyz` returns 200 when deps are up, and `/readyz` returns 503 with the failing dependency named in the body when Redis or Groq go down. CI runs `pnpm turbo test` ahead of typecheck and build on every push and PR, so a regression in the failure paths fails the pipeline. Source: [`apps/gateway/src/__tests__/health.test.ts`](../apps/gateway/src/__tests__/health.test.ts). Breaker, rate-limit, and queue-retry tests are the natural next additions.
+
 # 3. Scalability
 
 The gateway scales horizontally; workers and Redis are vertically bounded, but we made that choice on purpose (see Section 6).
@@ -108,6 +112,18 @@ A few things worth being honest about:
 - **Co-located load generator.** k6 ran on the same host as Docker Desktop, competing for CPU. The clearest sign of this is the unexpected `baseline` p95 regression on the 3-replica run.
 - **Mocked Groq.** All Groq calls returned in under 1 ms. That's deliberate — we wanted to isolate the gateway/queue layer — but it means the absolute p95 numbers aren't what you'd see in production.
 - **One iteration per configuration.** No statistical variance, no confidence intervals.
+
+## 3.4 Production deployment
+
+The same compose model that demonstrates scale-out locally also runs in production, on a single Oracle Cloud VM via [`docker-compose.prod.yml`](../docker-compose.prod.yml). The prod compose pulls multi-arch images (`linux/amd64` + `linux/arm64`) from GHCR rather than building on the host, so deployment is image-pull + container-restart rather than a source build.
+
+Three sequential GitHub Actions jobs ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) run on every push to `main`:
+
+1. **`typecheck-build`** — `pnpm install`, `prisma generate`, `pnpm turbo test`, then typecheck and build across all workspaces.
+2. **`docker`** — `docker buildx` builds and pushes multi-arch images for `gateway` and `workers` to GHCR with a GHA build cache.
+3. **`deploy`** — SSH into the Oracle host, `git pull`, `docker login ghcr.io`, `docker compose -f docker-compose.prod.yml pull && up -d --remove-orphans`, prune dangling images.
+
+The prod compose intentionally omits Prometheus / Grafana / Bull Board (separate observability deploy) and the SPA (served from Cloudflare Pages / Vercel using the same `apps/web` build).
 
 # 4. Observability
 
