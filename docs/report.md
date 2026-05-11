@@ -115,15 +115,15 @@ A few things worth being honest about:
 
 ## 3.4 Production deployment
 
-The same compose model that demonstrates scale-out locally also runs in production, on a single Oracle Cloud VM via [`docker-compose.prod.yml`](../docker-compose.prod.yml). The prod compose pulls multi-arch images (`linux/amd64` + `linux/arm64`) from GHCR rather than building on the host, so deployment is image-pull + container-restart rather than a source build.
+Production splits the system across two hosts. The gateway, workers, Redis, and `nginx-lb` run on a single Oracle Cloud VM via [`docker-compose.prod.yml`](../docker-compose.prod.yml), pulling multi-arch (`linux/amd64` + `linux/arm64`) images from GHCR rather than building on the host. The React SPA is hosted on Vercel.
 
-Three sequential GitHub Actions jobs ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) run on every push to `main`:
+Three GitHub Actions workflows handle the release pipeline, separated by path filter so a doc-only or web-only change skips the expensive backend rebuild:
 
-1. **`typecheck-build`** — `pnpm install`, `prisma generate`, `pnpm turbo test`, then typecheck and build across all workspaces.
-2. **`docker`** — `docker buildx` builds and pushes multi-arch images for `gateway` and `workers` to GHCR with a GHA build cache.
-3. **`deploy`** — SSH into the Oracle host, `git pull`, `docker login ghcr.io`, `docker compose -f docker-compose.prod.yml pull && up -d --remove-orphans`, prune dangling images.
+- [`ci.yml`](../.github/workflows/ci.yml) — runs `pnpm turbo test` + typecheck + build on every push and PR. No deploy steps.
+- [`deploy.yml`](../.github/workflows/deploy.yml) — on push to `main` with `paths-ignore` for `apps/web/**`, `vercel.json`, docs and markdown files. Runs the same checks, then `docker buildx` multi-arch push to GHCR, then SSHs into the Oracle host to `git reset --hard origin/main`, `docker compose pull && up -d`, and **explicitly restart `nginx-lb`** so it re-resolves the new gateway container (Docker's embedded DNS otherwise caches the old IP).
+- [`deploy-web.yml`](../.github/workflows/deploy-web.yml) — on push to `main` with `paths` filter for `apps/web/**`, `packages/**`, and `vercel.json`. Runs the same checks, then `npx vercel --prod`. The Vercel build ([`vercel.json`](../vercel.json)) rewrites `/api/:path*` to the Oracle backend, so the browser only ever talks to the Vercel origin — no CORS configuration needed at the gateway.
 
-The prod compose intentionally omits Prometheus / Grafana / Bull Board (separate observability deploy) and the SPA (served from Cloudflare Pages / Vercel using the same `apps/web` build).
+The prod compose intentionally omits Prometheus, Grafana, and Bull Board (those remain in the local `docker-compose.yml` for the observability story) and the SPA (Vercel handles it).
 
 # 4. Observability
 

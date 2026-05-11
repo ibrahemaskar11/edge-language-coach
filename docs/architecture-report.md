@@ -133,15 +133,21 @@ Workers are horizontally scalable as well — BullMQ supports multiple consumers
 
 ### 3.5 Production deployment
 
-The same compose model that demonstrates scale-out locally also runs in production, on a single Oracle Cloud VM via [`docker-compose.prod.yml`](../docker-compose.prod.yml). The prod compose file pulls multi-arch images (`linux/amd64` + `linux/arm64`) from GHCR rather than building on the host, so the deployment surface is image-pull + container-restart, not source build.
+Production splits the system across two hosts: the gateway, workers, Redis, and `nginx-lb` run on a single Oracle Cloud VM via [`docker-compose.prod.yml`](../docker-compose.prod.yml); the React SPA is hosted on Vercel. Three GitHub Actions workflows manage the release pipeline:
 
-The release pipeline ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) is three sequential GitHub Actions jobs:
+| Workflow | Trigger | Result |
+|---|---|---|
+| [`ci.yml`](../.github/workflows/ci.yml) | every push and PR to `main` | `pnpm turbo test` + typecheck + build. No deploy steps — strictly a per-PR check. |
+| [`deploy.yml`](../.github/workflows/deploy.yml) | push to `main`, `paths-ignore: apps/web/**, vercel.json, docs/**, **.md` | typecheck/build/test → `docker buildx` multi-arch (`linux/amd64`+`linux/arm64`) push to GHCR → SSH deploy to the Oracle host |
+| [`deploy-web.yml`](../.github/workflows/deploy-web.yml) | push to `main`, `paths: apps/web/**, packages/**, vercel.json` | typecheck/build/test → `npx vercel --prod` |
 
-1. `typecheck-build` — `pnpm install`, `prisma generate`, `pnpm turbo test`, then typecheck + build across all workspaces.
-2. `docker` (only on push to `main`) — `docker buildx` builds and pushes multi-arch images for `gateway` and `workers` to GHCR with a GHA build cache.
-3. `deploy` (only on push to `main`) — SSH into the Oracle host, `git pull`, `docker login ghcr.io`, `docker compose -f docker-compose.prod.yml pull && up -d --remove-orphans`, then prune dangling images.
+The path filters mean a doc-only or web-only change skips the (expensive) backend rebuild, and a backend-only change skips the SPA deploy. This keeps the median deploy cycle under a minute on docs and under three minutes on a backend-only change.
 
-The prod compose includes Redis, workers, gateway, and `nginx-lb`; it intentionally omits Prometheus/Grafana/Bull Board (separate observability deploy) and the SPA (served from Cloudflare Pages / Vercel from the same `apps/web` build).
+The Oracle host deploy step does `git reset --hard origin/main`, `docker compose pull && up -d --remove-orphans`, then **explicitly restarts `nginx-lb`** before pruning dangling images. The explicit restart is load-bearing: Docker's embedded DNS otherwise caches the old gateway container's IP and the load balancer keeps trying to reach a container that no longer exists.
+
+The Vercel build is driven by [`vercel.json`](../vercel.json), which runs `pnpm turbo build --filter=@edge/web` and rewrites `/api/:path*` to the Oracle backend's `:3001` port. The browser only ever talks to the Vercel origin, which sidesteps the need for CORS configuration at the gateway.
+
+The prod compose includes Redis, workers, gateway, and `nginx-lb`; it intentionally omits Prometheus, Grafana, and Bull Board (those remain in the local `docker-compose.yml` for the observability story), and the SPA (Vercel handles that).
 
 ---
 

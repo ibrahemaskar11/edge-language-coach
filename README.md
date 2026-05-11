@@ -310,15 +310,24 @@ pnpm --filter @edge/remediation-mcp build  && pnpm --filter @edge/remediation-mc
 pnpm build
 ```
 
-## Production deployment (Oracle Cloud)
+## Production deployment
 
-Production runs on a single Oracle Cloud VM via [`docker-compose.prod.yml`](docker-compose.prod.yml). The compose file pulls multi-arch (`linux/amd64` + `linux/arm64`) images from GHCR rather than building locally, so the host doesn't need the source tree present at build time.
+Production is split across two hosts with three GitHub Actions workflows. The two deploy workflows use `paths` / `paths-ignore` filters so a backend-only change skips the SPA rebuild and a frontend-only change skips the Docker build + SSH push.
 
-The full pipeline is in [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+| Workflow | Trigger | What it does |
+|---|---|---|
+| [`ci.yml`](.github/workflows/ci.yml) | every push + PR to `main` | `pnpm turbo test` + typecheck + build. **No deploy steps.** |
+| [`deploy.yml`](.github/workflows/deploy.yml) | push to `main`, `paths-ignore: apps/web/**, vercel.json, docs/**, **.md` | typecheck/build/test → buildx multi-arch push to GHCR → SSH deploy to Oracle |
+| [`deploy-web.yml`](.github/workflows/deploy-web.yml) | push to `main`, `paths: apps/web/**, packages/**, vercel.json` | typecheck/build/test → `npx vercel --prod` |
 
-1. **`typecheck-build`** — install deps, generate Prisma client, run `pnpm turbo test`, then typecheck and build every workspace.
-2. **`docker`** (only on `push` to `main`) — build and push multi-arch images for `gateway` and `workers` to GHCR using `docker/build-push-action`. Cached via GHA cache for fast incremental builds.
-3. **`deploy`** (only on `push` to `main`) — SSH into the Oracle host, `git pull`, `docker login ghcr.io`, `docker compose -f docker-compose.prod.yml pull && up -d --remove-orphans`, then prune dangling images.
+### Backend — Oracle Cloud VM
+
+The gateway, workers, Redis, and `nginx-lb` run on a single Oracle Cloud VM via [`docker-compose.prod.yml`](docker-compose.prod.yml). The compose file pulls multi-arch (`linux/amd64` + `linux/arm64`) images from GHCR rather than building on the host, so the deployment surface is image-pull + container-restart.
+
+The three jobs in `deploy.yml`:
+1. **`typecheck-build`** — install deps, generate Prisma client, `pnpm turbo test`, then typecheck and build every workspace.
+2. **`docker`** — `docker/build-push-action` builds multi-arch images for `gateway` and `workers` and pushes to GHCR with a GHA build cache.
+3. **`deploy`** — SSH into the Oracle host, `git reset --hard origin/main`, `docker login ghcr.io`, `docker compose -f docker-compose.prod.yml pull && up -d --remove-orphans`, then **explicitly restart `nginx-lb`** so it re-resolves the new gateway container (Docker's embedded DNS otherwise caches the old container's IP), and prune dangling images.
 
 Required GitHub secrets:
 
@@ -330,7 +339,26 @@ Required GitHub secrets:
 
 Required env on the host (in a `.env` next to `docker-compose.prod.yml`): `GHCR_REPO`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `GROQ_API_KEY`. Optional: `GROQ_BASE_URL`, `DEMO_MODE`.
 
-The prod compose file deliberately omits Prometheus, Grafana, Bull Board UI, and the web frontend (the SPA is served from a separate Cloudflare Pages / Vercel deploy). Web app + observability stack remain in the dev `docker-compose.yml`.
+The prod compose intentionally omits Prometheus, Grafana, and Bull Board (those stay in the dev `docker-compose.yml` for the local observability story). The SPA is deployed separately, see below.
+
+### Frontend — Vercel
+
+The React SPA is deployed to Vercel via [`deploy-web.yml`](.github/workflows/deploy-web.yml). The build is driven by [`vercel.json`](vercel.json):
+
+```json
+{
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm turbo build --filter=@edge/web",
+  "outputDirectory": "apps/web/dist",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "http://<oracle-host>:3001/api/:path*" }
+  ]
+}
+```
+
+The `rewrites` rule proxies every `/api/*` request through Vercel's edge to the Oracle backend, so the browser only ever talks to the Vercel origin — no CORS configuration needed on the gateway.
+
+Required GitHub secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
 
 ## Building the architecture report PDF
 
