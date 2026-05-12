@@ -254,6 +254,7 @@ Wraps the Prometheus `/metrics` and `/readyz` endpoints with five typed tools:
 | `get_circuit_breaker_state` | Groq breaker state for `chat` and `transcribe` (closed / open / half-open) |
 | `get_active_sessions` | Current count of `status=coaching` sessions |
 | `get_groq_latency` | Raw `groq_request_duration_seconds` histogram lines |
+| `get_safety_policy` | Returns the operational safety policy text so the agent self-binds at session start |
 
 ### `remediation-mcp` — guarded write
 

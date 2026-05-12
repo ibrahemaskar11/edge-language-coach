@@ -23,6 +23,8 @@ const order = [
   join(docsDir, "architecture-report.md"),
   join(docsDir, "c4-diagram.md"),
   join(docsDir, "slo-table.md"),
+  join(docsDir, "safety-policy.md"),
+  join(docsDir, "cost-roi.md"),
 ];
 
 if (existsSync(adrDir)) {

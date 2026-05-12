@@ -2,265 +2,225 @@
 
 ## 1. System Overview
 
-Edge Language Coach is an Italian language learning application that uses AI-powered conversational practice, spaced-repetition flashcards, and automated topic curation to help learners improve fluency.
+Edge Language Coach is an Italian language learning app. It uses LLM-driven conversation practice, spaced-repetition flashcards and automated topic curation to help learners improve fluency.
 
-The system is designed as a **distributed, event-driven architecture** with three independently deployable runtime units:
+The system is a distributed, event-driven architecture with three independently deployable runtime units:
 
 | Unit | Technology | Role |
 |------|-----------|------|
-| Web | React 19 + Vite → nginx | SPA served as static files |
-| Gateway | Fastify (Node.js) | REST API, auth, reliability primitives |
-| Workers | Node.js + BullMQ | Async job processing (scraper, summary, flashcards) |
+| Web | React 19 + Vite served by nginx | SPA, static build |
+| Gateway | Fastify (Node.js 22) | REST API, auth, reliability primitives |
+| Workers | Node.js + BullMQ | Async jobs (scraper, summary, flashcards) |
 
-See `docs/c4-diagram.md` for full C4 Level 1–3 diagrams.
+Full C4 diagrams are in [docs/c4-diagram.md](./c4-diagram.md).
 
 ---
 
 ## 2. Reliability Mechanisms
 
-### 2.1 Circuit Breaker (Groq API)
+### 2.1 Circuit breaker (Groq API)
 
-The gateway wraps all Groq API calls (LLM chat completions, Whisper transcription) in two independent `opossum` circuit breakers:
+The gateway wraps every Groq call (chat completions, Whisper transcription) in an `opossum` circuit breaker. The chat breaker opens after a 50 percent error rate over a rolling 60 s window (minimum 10 requests) and resets after 30 s. The transcribe breaker has the same thresholds but a 60 s timeout (audio inference is slower).
 
-- **Chat breaker**: Opens after 50% error rate over a 60 s rolling window (min 10 requests). Resets after 30 s.
-- **Transcribe breaker**: Same thresholds, with a 60 s timeout (audio inference is slower).
+When a breaker is open, requests fail immediately instead of blocking the event loop on a stalled upstream. Breaker state is exposed as a Prometheus gauge (`groq_circuit_breaker_state`) and visible in the Grafana dashboard.
 
-When a breaker is open, requests to that capability return an immediate error rather than blocking the gateway thread waiting for a timeout. This prevents Groq slowdowns from cascading into full service degradation.
-
-Breaker state is exposed as a Prometheus gauge (`groq_circuit_breaker_state`) and visible in the Grafana dashboard.
-
-**Measured breaker behaviour.** The breaker was exercised end-to-end using a mock Groq server ([`mocks/groq-mock.mjs`](../mocks/groq-mock.mjs)) put into `slow` mode (30 s sleep per request, exceeding the 15 s breaker timeout) and the driver script ([`mocks/breaker-driver.mjs`](../mocks/breaker-driver.mjs)) firing 60 requests at concurrency 12. Full output at [`load/breaker-demo-output.txt`](../load/breaker-demo-output.txt). Summary:
+**Measured behaviour.** We exercised the breaker with a mock Groq server ([mocks/groq-mock.mjs](../mocks/groq-mock.mjs)) in slow mode (30 s sleep per request, exceeding the 15 s breaker timeout) and a driver script ([mocks/breaker-driver.mjs](../mocks/breaker-driver.mjs)) firing 60 requests at concurrency 12. Full output at [load/breaker-demo-output.txt](../load/breaker-demo-output.txt).
 
 | Phase | Calls | Per-call latency | Status |
 |---|---|---|---|
-| Closed (probing) | 1–7 | 15.3 s (timeout) | breaker collecting failure samples |
-| **Transition** | call 7 | — | volumeThreshold (10) + 50% error rate crossed → **opened** |
-| Open (short-circuit) | 8–60 | 12–58 ms | requests fail-fast, never reach mock |
+| Closed (probing) | 1 to 7 | 15.3 s (timeout) | breaker collecting failure samples |
+| Transition | call 7 | | volumeThreshold (10) plus 50 percent error rate crossed, breaker opens |
+| Open (short-circuit) | 8 to 60 | 12 to 58 ms | requests fail fast, never reach mock |
 
-**Latency cliff:** 15 300 ms → 25 ms in adjacent calls. Without the breaker, all 60 requests would have hit the 15 s timeout sequentially or in parallel waves; with it, only 7 calls paid the upstream-stalled cost. The remaining 53 calls cost the system effectively zero CPU and zero open sockets to Groq.
+Adjacent-call latency cliff: 15,300 ms to 25 ms. Without the breaker all 60 requests would have queued against the slow upstream and paid the 15 s timeout each. With it, only 7 calls paid that cost.
 
-### 2.2 Rate Limiting
+### 2.2 Rate limiting, retries and idempotency
 
-All API routes are rate-limited at 60 requests/minute per authenticated user (or per IP for unauthenticated requests), backed by Redis for distributed counting across replicas. Health probes (`/livez`, `/readyz`, `/metrics`) are allowlisted.
+- **Rate limit.** 60 requests/minute per authenticated user (per IP for unauthenticated traffic), backed by Redis so the limit is shared across gateway replicas. Health probes are allowlisted.
+- **Retries.** BullMQ workers use `attempts: 3, backoff: { type: 'exponential', delay: 5000 }`. Failed jobs after the retry budget are logged at `error` level with `dlq: true` and visible in Bull Board at `:3002/queues`.
+- **Idempotency.** The scraper sets `scraper:slot:<date>:<6h-window>` in Redis on success (TTL 6 h). A retry inside the same window is a no-op. Title-level deduplication against the last 30 days of topics is a second layer.
 
-### 2.3 Job Queue Retry & DLQ
+### 2.3 Timeouts
 
-Workers use BullMQ with a shared retry configuration (3 attempts, exponential backoff starting at 5 s). Failed jobs are logged at `error` level with `dlq: true` after exhausting all retries, providing a structured dead-letter record visible in log aggregation without requiring a separate DLQ queue.
+Gateway 30 s connection, 5 s keep-alive. Groq chat 15 s, transcribe 60 s. Health probe 2 s per dependency (Redis, Supabase, Groq).
 
-All queue state is visible in the Bull Board UI at `:3002/queues`.
+### 2.4 Recovery Time Objectives
 
-### 2.4 Scraper Idempotency
+Derived from the configured timeouts and retry policies, not measured separately.
 
-The scraper cron job (every 6 hours) sets a Redis key after each successful run (`scraper:slot:<date>:<slot>`, TTL = 6 h). If the job is retried within the same time window (e.g., after a transient failure), it exits early to prevent duplicate topic ingestion.
+| Failure mode | Total RTO |
+|---|---|
+| Groq slowdown or outage | about 90 s (breaker opens within one 60 s window, then 30 s resetTimeout, then 2 s `/readyz` propagation) |
+| Redis blip | about 20 s |
+| Gateway replica crash | sub-second (nginx-lb round-robins to a healthy replica) |
+| Worker job failure | about 20 s before DLQ visibility |
+| Scraper duplicate replay | about 1 s |
 
-Title-level deduplication (exact and prefix match against the last 30 days of topics) provides a second layer of protection.
+The Groq RTO dominates because it covers the user-facing chat path.
 
-### 2.5 Timeouts
+### 2.5 Integration tests
 
-- Gateway: 30 s connection timeout, 5 s keep-alive timeout
-- Groq chat: 15 s circuit breaker timeout
-- Groq transcribe: 60 s circuit breaker timeout
-- Health probes: 2 s per dependency check (Redis, Supabase, Groq)
+The reliability claims above are pinned in CI. The gateway has a Vitest suite ([apps/gateway/src/__tests__/health.test.ts](../apps/gateway/src/__tests__/health.test.ts)) using Fastify's `inject()` harness, with Redis, Supabase and Groq mocked at module boundaries so tests run hermetically. Currently covered: `/livez` 200, `/readyz` 200 when healthy, `/readyz` 503 with the failing dep named when Redis or Groq go down.
 
-### 2.6 Integration tests
-
-The reliability claims in §2.1–§2.5 are not just asserted in prose — they are pinned in CI. The gateway has a Vitest suite ([`apps/gateway/src/__tests__/health.test.ts`](../apps/gateway/src/__tests__/health.test.ts)) using Fastify's `inject()` harness, with Redis, Supabase, and Groq mocked at module boundaries so tests run hermetically. Currently covered:
-
-- `GET /livez` returns 200 unconditionally.
-- `GET /readyz` returns 200 with `{status: "ready"}` when all dependencies are healthy.
-- `GET /readyz` returns 503 with `{deps: {redis: {ok: false}}}` when the Redis ping rejects.
-- `GET /readyz` returns 503 with `{deps: {groq: {ok: false}}}` when the Groq probe rejects.
-
-CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs `pnpm turbo test` ahead of typecheck and build on every push and PR, so a regression in the readiness path or its failure semantics fails the pipeline. Breaker, rate-limit, and queue-retry tests are the natural next additions and would close the rest of the gap.
+CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)) runs `pnpm turbo test` ahead of typecheck and build on every push and PR. Breaker, rate-limit and queue-retry tests are the natural next additions.
 
 ---
 
 ## 3. Scalability
 
-### 3.1 Horizontal Gateway Scale-out
+### 3.1 Horizontal gateway scale-out
 
-The gateway is stateless (all session state is in Supabase; all rate-limit counters are in Redis). It can be scaled horizontally with:
+The gateway is stateless. Session state lives in Supabase, rate-limit counters live in Redis. Scaling is one flag:
 
 ```bash
 docker compose up --scale gateway=3
 ```
 
-An nginx load balancer (`nginx-lb`) sits in front of all gateway replicas and distributes traffic via Docker's built-in DNS round-robin. The web SPA and Prometheus both target `nginx-lb:3001`.
+`nginx-lb` sits in front and round-robins via Docker's built-in DNS. The web SPA and Prometheus both target `nginx-lb:3001`, so adding replicas needs no client-side or scrape-config change.
 
-### 3.2 Measured Scale-Out Behaviour
+### 3.2 Measured behaviour
 
-The k6 script at `load/gateway.js` runs three sequential scenarios in a single invocation:
-
-| Scenario | Profile | Purpose |
-|---|---|---|
-| `baseline` | 10 VUs constant for 30 s | Light steady-state load |
-| `stressed` | Ramp 0 → 50 VUs over 60 s, then taper | Stress test rate-limit + downstream |
-| `scaled_out` | 50 VUs constant for 30 s | Saturated steady-state |
-
-The full script was run twice — once with a single gateway replica (`docker compose up gateway`), once with three replicas (`docker compose up --scale gateway=3`). All other parameters were held constant. Results:
+The k6 script at `load/gateway.js` runs three scenarios back to back: baseline (10 VUs for 30 s), stressed (ramp 0 to 50 VUs over 60 s) and scaled_out (50 VUs for 30 s). We ran it twice, once with one gateway replica and once with three, keeping everything else fixed.
 
 | Metric | 1 replica | 3 replicas | Δ |
 |---|---|---|---|
-| `gateway_errors` rate | **6.81 %** | **0.27 %** | **−96 %** |
+| `gateway_errors` rate | 6.81 % | 0.27 % | −96 % |
 | `scaled_out` p95 latency | 2.43 s | 2.15 s | −12 % |
 | `stressed` p95 latency | 1.73 s | 1.84 s | +6 % |
-| `baseline` p95 latency | 0.34 s | 0.66 s | +93 % (cold-start noise; see §3.3) |
+| `baseline` p95 latency | 0.34 s | 0.66 s | +93 % (cold-start noise, see Section 3.3) |
 | Sustained throughput | 39.3 req/s | 39.4 req/s | unchanged |
 
-**Interpretation.** Adding replicas had a dramatic effect on the *error rate* (the 1-replica gateway was dropping ~7 % of requests under saturation; with 3 replicas this collapsed to under 0.3 %), but only a modest effect on *latency* under saturation (~12 % p95 reduction). This indicates that under sustained load:
+Adding replicas had a dramatic effect on error rate (the 1-replica gateway dropped about 7 percent of requests under saturation, the 3-replica setup dropped under 0.3 percent) and a modest effect on latency. The gateway is the bottleneck for availability, the downstream hot path (Supabase RTT, Redis round-trips) is the bottleneck for latency, so adding gateway replicas does not help with the latter.
 
-- The **gateway itself** is the bottleneck for **availability** — a single Node.js event loop cannot keep up with 50 concurrent virtual users plus rate-limit checks plus auth verification, so it starts dropping connections.
-- The **downstream request hot path** (Supabase RTT, Redis rate-limit checks) is the bottleneck for **latency** — adding gateway replicas does not reduce the per-request work outside the gateway, so p95 only improves marginally.
+The persistent ~25 percent `http_req_failed` rate seen in both runs is the rate limiter doing its job. 50 VUs at ~10 req/s is roughly 500 req/min, well over the 60 req/min cap, so most failures are 429s.
 
-The persistent ~25 % `http_req_failed` rate seen in both runs is the rate-limiter doing its job correctly: 50 VUs × ~10 req/s ≈ 500 req/min vs. the configured 60 req/min cap. These are 429 responses, not failures of the system.
+### 3.3 Threats to validity
 
-### 3.3 Caveats and Threats to Validity
+- **Co-located load generator.** k6 ran on the same Windows host as Docker Desktop, competing for CPU. Most visible in the unexpected `baseline` regression on the 3-replica run.
+- **Mocked Groq.** All Groq calls returned in under 1 ms via the mock. Deliberate (isolates the gateway and queue layer) but means absolute p95 numbers are not production estimates.
+- **Single iteration per configuration.** No statistical variance.
 
-- **Co-located load generator.** k6 ran on the same Windows host as Docker Desktop, so the test loop competed for CPU with the containers. This is most visible in the unexpected `baseline` p95 regression on the 3-replica run (Docker had to schedule three gateway containers + the original two from the first run, evicting cache pages).
-- **Mocked Groq.** All Groq calls returned in <1 ms via [`mocks/groq-mock.mjs`](../mocks/groq-mock.mjs), eliminating a normally significant latency contributor. This isolates the gateway/queue layer (the system under test) but means absolute p95 numbers should not be read as production estimates.
-- **Single iteration.** Each replica configuration was tested once; no statistical variance across runs.
-- **Limited scale.** Three replicas is the largest configuration tested (constrained by available host CPU). The diminishing-returns curve at higher replica counts has not been measured.
+### 3.4 Worker concurrency
 
-### 3.4 Worker Concurrency
-
-Workers are horizontally scalable as well — BullMQ supports multiple consumers on the same queue and guarantees each job is processed exactly once. Within a single worker process, per-queue concurrency is configured independently:
-
-| Queue | Concurrency | Rationale |
-|-------|-------------|-----------|
-| `flashcard-generate` | 3 | Parallelism limited by Groq rate limits |
-| `summary-generate` | 3 | Same |
-| `topic-scrape` | 1 | Scraper is serial to avoid race conditions on dedup state |
+Workers scale horizontally too. BullMQ supports multiple consumers on the same queue and guarantees each job is processed exactly once. Per-queue concurrency: 3 for `flashcard-generate` and `summary-generate` (limited by Groq rate limits), 1 for `topic-scrape` (serial to avoid race conditions on dedup state).
 
 ### 3.5 Production deployment
 
-Production splits the system across two hosts: the gateway, workers, Redis, and `nginx-lb` run on a single Oracle Cloud VM via [`docker-compose.prod.yml`](../docker-compose.prod.yml); the React SPA is hosted on Vercel. Three GitHub Actions workflows manage the release pipeline:
+Production splits the system across two hosts. The gateway, workers, Redis and `nginx-lb` run on a single Oracle Cloud VM via [docker-compose.prod.yml](../docker-compose.prod.yml), pulling multi-arch (`linux/amd64` and `linux/arm64`) images from GHCR. The React SPA runs on Vercel.
+
+Three GitHub Actions workflows handle the pipeline, separated by path filter so a docs-only or web-only change skips the backend rebuild:
 
 | Workflow | Trigger | Result |
 |---|---|---|
-| [`ci.yml`](../.github/workflows/ci.yml) | every push and PR to `main` | `pnpm turbo test` + typecheck + build. No deploy steps — strictly a per-PR check. |
-| [`deploy.yml`](../.github/workflows/deploy.yml) | push to `main`, `paths-ignore: apps/web/**, vercel.json, docs/**, **.md` | typecheck/build/test → `docker buildx` multi-arch (`linux/amd64`+`linux/arm64`) push to GHCR → SSH deploy to the Oracle host |
-| [`deploy-web.yml`](../.github/workflows/deploy-web.yml) | push to `main`, `paths: apps/web/**, packages/**, vercel.json` | typecheck/build/test → `npx vercel --prod` |
+| [ci.yml](../.github/workflows/ci.yml) | every push and PR | `pnpm turbo test` plus typecheck plus build. No deploy. |
+| [deploy.yml](../.github/workflows/deploy.yml) | push to `main`, paths-ignore web/docs/markdown | tests, then `docker buildx` multi-arch push to GHCR, then SSH deploy to Oracle |
+| [deploy-web.yml](../.github/workflows/deploy-web.yml) | push to `main`, paths web/packages/vercel.json | tests, then `npx vercel --prod` |
 
-The path filters mean a doc-only or web-only change skips the (expensive) backend rebuild, and a backend-only change skips the SPA deploy. This keeps the median deploy cycle under a minute on docs and under three minutes on a backend-only change.
+The Oracle deploy step does `git reset --hard origin/main`, `docker compose pull && up -d`, then **explicitly restarts `nginx-lb`** so it re-resolves the new gateway container. Docker's embedded DNS otherwise caches the old IP and the load balancer keeps trying to reach a container that no longer exists.
 
-The Oracle host deploy step does `git reset --hard origin/main`, `docker compose pull && up -d --remove-orphans`, then **explicitly restarts `nginx-lb`** before pruning dangling images. The explicit restart is load-bearing: Docker's embedded DNS otherwise caches the old gateway container's IP and the load balancer keeps trying to reach a container that no longer exists.
-
-The Vercel build is driven by [`vercel.json`](../vercel.json), which runs `pnpm turbo build --filter=@edge/web` and rewrites `/api/:path*` to the Oracle backend's `:3001` port. The browser only ever talks to the Vercel origin, which sidesteps the need for CORS configuration at the gateway.
-
-The prod compose includes Redis, workers, gateway, and `nginx-lb`; it intentionally omits Prometheus, Grafana, and Bull Board (those remain in the local `docker-compose.yml` for the observability story), and the SPA (Vercel handles that).
+The Vercel build is driven by [vercel.json](../vercel.json), which rewrites `/api/:path*` to the Oracle backend, so the browser only ever talks to the Vercel origin. No CORS at the gateway. The prod compose omits Prometheus, Grafana and Bull Board (they remain in `docker-compose.yml` for the local observability story) and the SPA (Vercel handles that).
 
 ---
 
 ## 4. Observability
 
-### 4.1 Structured Logging (Pino)
+All services emit JSON-structured logs via `pino` with `service`, `requestId` and relevant domain fields (`sessionId`, `jobId`, `queue`). Log level is configurable via `LOG_LEVEL`.
 
-All services emit JSON-structured logs via `pino`. Each log line includes `service` (gateway/workers), `requestId`, and relevant domain fields (sessionId, jobId, queue name). Log level is configurable via `LOG_LEVEL` env var.
-
-### 4.2 Prometheus Metrics (prom-client)
-
-The gateway exposes `/metrics` in Prometheus text format, scraped every 15 s. Key metrics:
+Both the gateway and the workers expose `/metrics` in Prometheus text format, scraped every 15 s. Key metrics:
 
 | Metric | Type | Labels |
-|--------|------|--------|
+|---|---|---|
 | `http_request_duration_seconds` | Histogram | method, route, status_code |
-| `http_requests_total` | Counter | method, route, status_code |
-| `groq_circuit_breaker_state` | Gauge | breaker (chat/transcribe) |
+| `groq_request_duration_seconds` | Histogram | operation, status |
+| `groq_circuit_breaker_state` | Gauge | breaker |
+| `bullmq_job_duration_seconds` | Histogram | queue, status |
+| `jobs_dead_letter_total` | Counter | queue |
 | `queue_depth_total` | Gauge | queue |
-| `active_sessions_total` | Gauge | — |
+| `active_sessions_total` | Gauge | |
 
-Node.js default metrics (event loop lag, memory, GC) are also collected via `collectDefaultMetrics()`.
+Node defaults (event-loop lag, GC, RSS) are collected via `collectDefaultMetrics`. A Grafana dashboard provisioned from `docker/grafana/dashboards/edge-coach.json` is auto-loaded on startup.
 
-### 4.3 Grafana Dashboard
-
-A pre-provisioned dashboard (`docker/grafana/dashboards/edge-coach.json`) is loaded automatically on Grafana startup. Panels: request rate by route, p50/p95/p99 latency, 5xx error rate, circuit breaker state, queue depth, active sessions. Accessible at `localhost:3000` (admin/admin).
-
-### 4.4 Health Probes
-
-- `/livez`: Always 200 — liveness signal for container orchestration.
-- `/readyz`: Checks Redis, Supabase, and Groq availability with 2 s timeouts. Returns 503 if any dependency is degraded.
+Two health probes back container orchestration. `GET /livez` always returns 200. `GET /readyz` pings Redis, Supabase and Groq with 2 s timeouts and returns 503 with the failing dependency named in the body.
 
 ---
 
 ## 5. Operator Surface — Agentic MCP
 
-A two-server [Model Context Protocol](https://modelcontextprotocol.io) layer exposes the running system to agent-driven inspection and remediation, **without** SSH, `kubectl`, or a redeploy. This closes the operator loop on top of the observability stack: **detect** (Prometheus / Grafana) → **diagnose** (`observability-mcp`) → **remediate** (`remediation-mcp`).
+Two [Model Context Protocol](https://modelcontextprotocol.io) servers expose the running system to agent-driven inspection and remediation, without SSH, kubectl or a redeploy. The loop is: detect (Prometheus, Grafana) then diagnose (`observability-mcp`) then remediate (`remediation-mcp`).
 
-The two servers are separated by privilege: read-only telemetry on one transport, guarded mutations on a second.
+The two servers are split by privilege.
 
-### 5.1 `observability-mcp` (read-only)
+### 5.1 `observability-mcp` (read only)
 
-Wraps `/metrics` and `/readyz` as five typed tools. No mutation, no auth (stdio transport, locally scoped). Source: [`apps/observability-mcp/src/index.ts`](../apps/observability-mcp/src/index.ts).
+Wraps `/metrics` and `/readyz` as six typed tools. No mutation, no auth needed (stdio, locally scoped). Source: [apps/observability-mcp/src/index.ts](../apps/observability-mcp/src/index.ts).
 
 | Tool | Backed by |
 |---|---|
-| `get_service_health` | Gateway + workers `/readyz` |
+| `get_service_health` | gateway and workers `/readyz` |
 | `get_queue_metrics` | `queue_depth_total` per queue |
 | `get_circuit_breaker_state` | `groq_circuit_breaker_state{breaker}` |
 | `get_active_sessions` | `active_sessions_total` |
 | `get_groq_latency` | `groq_request_duration_seconds` histogram lines |
+| `get_safety_policy` | returns `docs/safety-policy.md` so the agent self-binds at session start |
 
 ### 5.2 `remediation-mcp` (guarded write)
 
-Mutates runtime state through three layered guards. Source: [`apps/remediation-mcp/src/index.ts`](../apps/remediation-mcp/src/index.ts).
+Mutates runtime state through three layered guards (typed input, secret, irreversibility check). Source: [apps/remediation-mcp/src/index.ts](../apps/remediation-mcp/src/index.ts).
 
-| Tool | Mechanism | Guard | Reversible? |
+| Tool | Mechanism | Guard | Reversible |
 |---|---|---|---|
-| `pause_queue` / `resume_queue` | BullMQ admin via Redis | `zod.enum` restricts queue name to known queues | yes |
-| `reset_circuit_breaker` | `POST /admin/breakers/reset` ([apps/gateway/src/routes/admin.ts](../apps/gateway/src/routes/admin.ts)) | `ADMIN_API_KEY` HTTP header | yes (breakers may re-open if upstream is still bad) |
-| `flush_dead_letter_queue` | `Queue.clean('failed')` | `confirm: true` argument required | **no** |
+| `pause_queue` / `resume_queue` | BullMQ admin via Redis | `zod.enum` restricts queue name | yes |
+| `reset_circuit_breaker` | `POST /admin/breakers/reset` | `ADMIN_API_KEY` header | yes (may re-open if upstream is still bad) |
+| `flush_dead_letter_queue` | `Queue.clean('failed')` | `confirm: true` argument required | no |
 
-Every invocation writes a structured `pino` audit line to **stderr** (`stdout` is reserved for the MCP transport — see [remediation-mcp/src/index.ts:21-26](../apps/remediation-mcp/src/index.ts#L21-L26)).
+Every call writes a structured pino audit line to stderr (stdout is reserved for the MCP transport).
 
-### 5.3 Why this matters for reliability
+### 5.3 Capability classification
 
-Without the MCP layer, recovery from an open breaker, a poisoned DLQ, or a queue that needs to be drained for maintenance requires either a Bull Board click-through, a `redis-cli` session, or a redeploy. With it, the same diagnostic and remediation primitives are exposed as a typed, audited contract that any MCP client can call — Claude Desktop, Claude Code, or a future automated runbook agent.
+Every capability the agent can touch falls into deterministic, agentic or human in the loop. The line is not impact magnitude, it is whether the decision needs interpretation across heterogeneous signals.
 
-Concretely: when the breaker demo opens the chat breaker, the recovery sequence becomes a three-tool dialogue:
-1. `observability-mcp.get_circuit_breaker_state` → confirm `chat: open`
-2. (operator verifies upstream Groq is healthy)
-3. `remediation-mcp.reset_circuit_breaker` → forces both breakers closed; audit line on stderr
+| Capability | Class | Approval |
+|---|---|---|
+| Breaker trip, BullMQ retry, rate limiter, scraper idempotency | Deterministic | None (threshold based) |
+| `get_service_health` plus `get_groq_latency` synthesis | Agentic (advisory) | None (read only) |
+| `pause_queue` / `resume_queue` during a drain | Agentic (bounded) | None (reversible, typed enum) |
+| `reset_circuit_breaker` | Human in the loop | Holder of `ADMIN_API_KEY` |
+| `flush_dead_letter_queue` | Human in the loop | Explicit `confirm: true` from a human |
+| Infrastructure scaling | Operator only | Out of agent scope |
 
-This partially compensates for the absence of distributed tracing (ADR-004): the operator cannot follow a single span through the system, but they can interrogate live state with structured tools rather than reading raw metrics by hand.
+Full classification, hallucination controls, economic guardrails and rollback rules are in [docs/safety-policy.md](./safety-policy.md). The same numbers are derived in [docs/cost-roi.md](./cost-roi.md). At session start the agent calls `observability-mcp.get_safety_policy` and self-binds before any remediation.
+
+### 5.4 Why this matters for reliability
+
+Without the MCP layer, recovering from an open breaker or a poisoned DLQ needs a Bull Board click-through, a `redis-cli` session or a redeploy. With it, the same primitives are exposed as a typed, audited contract any MCP client can call.
+
+When the breaker demo opens the chat breaker, the recovery is a three-tool dialogue: `get_circuit_breaker_state` to confirm open, verify Groq is healthy, then `reset_circuit_breaker` to close. This partially compensates for the absence of distributed tracing (ADR 004). The operator cannot follow a single span through the system but can interrogate live state with structured tools.
 
 ---
 
 ## 6. SLO Targets
 
-See `docs/slo-table.md` for the full SLO table including k6 load test targets and measured results.
-
-Key SLOs:
-- API availability ≥ 99%
-- `/api/messages` p95 < 2 s at baseline (10 VUs)
-- 5xx error rate < 1% at baseline
+Full SLO table including k6 load test targets and measured results is in [docs/slo-table.md](./slo-table.md). Headlines: API availability at least 99 percent, `/api/messages` p95 under 2 s at baseline (10 VUs), 5xx rate under 1 percent at baseline.
 
 ---
 
-## 7. Trade-offs and Lessons Learned
+## 7. Trade-offs
 
-### Node.js workers over Go microservices
-Chose Node.js for velocity (shared TypeScript types, same toolchain). Trade-off: workers cannot scale independently. See ADR 001.
+Full reasoning is in the ADRs in [docs/adr](./adr/).
 
-### BullMQ + Redis over RabbitMQ
-Single Redis instance serves both rate-limiting and job queuing. Simpler infrastructure for a demo system. Trade-off: Redis is not a purpose-built broker. See ADR 002.
-
-### Supabase over self-hosted PostgreSQL
-Eliminates auth infrastructure; trade-off is external dependency making fully offline operation impossible. See ADR 003.
-
-### prom-client over full OpenTelemetry
-Faster to instrument, fewer services. Trade-off: no distributed traces across gateway→worker hops. See ADR 004.
-
-### Stateless gateway design
-Placing all shared state (rate limits, job queues) in Redis made horizontal scale-out trivial — no sticky sessions, no shared memory. The nginx-lb + Redis combination provides elasticity without code changes.
-
-### Agentic MCP operator surface (shipped)
-Originally listed as future work, now shipped as `apps/observability-mcp` and `apps/remediation-mcp`. The split between read-only and guarded-write transports is the load-bearing decision; bundling both into one server would have meant every consumer inherits the privilege of the most-privileged tool.
+- **Node.js workers over Go microservices.** Shared TypeScript types, same toolchain, faster iteration. Workers cannot scale independently (ADR 001).
+- **BullMQ on Redis over RabbitMQ.** One Redis instance does both queueing and rate limiting. Redis is not a purpose-built broker (ADR 002).
+- **Supabase over self-hosted Postgres.** Saved weeks on auth. External dependency, cannot run fully offline (ADR 003).
+- **prom-client only over full OpenTelemetry.** Faster to instrument, fewer services. No cross-service tracing (ADR 004).
+- **Stateless gateway.** All shared state in Redis. Horizontal scale-out is one flag.
+- **MCP operator surface shipped.** The split between read-only and guarded-write servers is the load-bearing decision. Bundling both into one would have meant every consumer inherits the privilege of the most-privileged tool.
 
 ---
 
-## 8. Future Work (Post-Course)
+## 8. Future Work
 
-- OpenTelemetry distributed tracing (gateway ↔ workers correlation)
-- Kubernetes deployment manifests (HPA for gateway)
-- Redis AOF persistence enabled for production durability
-- Tighten remediation-mcp auth: `pause_queue` / `resume_queue` currently rely on stdio-locality and the `zod.enum` queue allow-list; production deployment should require `ADMIN_API_KEY` for all mutating tools, not just `reset_circuit_breaker`
+- OpenTelemetry distributed tracing (gateway to workers correlation through the BullMQ payload).
+- Kubernetes manifests with HPA on `queue_depth_total` and `http_request_duration_seconds`.
+- Redis AOF persistence enabled for production durability.
+- Tighten `remediation-mcp` auth so `pause_queue` and `resume_queue` also require `ADMIN_API_KEY`, not just `reset_circuit_breaker`.
+- Statistical load testing with multiple iterations per configuration on a dedicated load-generation host.

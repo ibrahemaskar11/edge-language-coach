@@ -1,25 +1,18 @@
 # ADR 002 — BullMQ + Redis over RabbitMQ
 
-**Date:** 2026-04-30  
+**Date:** 2026-04-30
 **Status:** Accepted
 
 ## Context
 
-The async event-driven layer (Phase 3) needed a message broker to decouple the gateway from the workers (summary generation, flashcard generation, topic scraping). The two main candidates were RabbitMQ (AMQP) and Redis-backed BullMQ.
+The async event-driven layer needed a message broker between the gateway and the workers (summary generation, flashcard generation, topic scraping). Main candidates were RabbitMQ (AMQP) and BullMQ on Redis.
 
 ## Decision
 
-Use BullMQ with Redis as the message broker.
+Use BullMQ with Redis as the broker.
 
 ## Consequences
 
-**Positive:**
-- **Single dependency**: Redis serves both as the rate-limiter store (via `@fastify/rate-limit`) and the job queue backend, reducing the number of infrastructure services.
-- **Rich job lifecycle**: BullMQ provides built-in retry with exponential backoff, dead-letter tracking, delayed jobs, recurring cron jobs, and a monitoring UI (Bull Board) — features that require plugins or custom code in RabbitMQ.
-- **Simpler local dev**: `docker compose up redis` is sufficient; no RabbitMQ management UI or vhost setup needed.
-- **TypeScript-native**: BullMQ is written in TypeScript; type-safe job data without protobuf/AMQP schema definitions.
+Positive: one dependency. Redis is already the rate-limiter store (`@fastify/rate-limit`) so we reuse it as the queue backend. BullMQ provides retry with exponential backoff, dead-letter tracking, delayed jobs, recurring crons and Bull Board out of the box, all of which would be plugins or custom code in RabbitMQ. Local dev is just `docker compose up redis`. BullMQ is TypeScript-native, so job data is type-safe without protobuf or AMQP schema files.
 
-**Negative:**
-- Redis is not a purpose-built message broker. Under extreme load it can lose acknowledged-but-not-persisted messages if AOF persistence is not enabled. Mitigated by running Redis with default append-only persistence in production.
-- BullMQ does not support fanout/pub-sub patterns natively. Not required for current workloads.
-- Vendor lock-in to Redis data structures. Switching to RabbitMQ later would require replacing all queue producers and consumers.
+Negative: Redis is not a purpose-built broker. Under extreme load it can lose acknowledged-but-not-persisted messages without AOF persistence (mitigated by enabling AOF in production). No native fanout or pub-sub (not required here). Switching to RabbitMQ later means replacing all queue producers and consumers.

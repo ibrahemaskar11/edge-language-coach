@@ -21,7 +21,7 @@
 
 ## Measured Results
 
-Sourced from `k6 run load/gateway.js` against `docker compose up --scale gateway=N` with Groq mocked (see [architecture-report.md §3](./architecture-report.md) for full methodology and threats to validity). Comparison of the same script run against 1 vs 3 gateway replicas:
+Sourced from `k6 run load/gateway.js` against `docker compose up --scale gateway=N` with Groq mocked (see [architecture-report.md](./architecture-report.md) for full methodology and threats to validity). Comparison of the same script run against 1 vs 3 gateway replicas:
 
 | Scenario | Replicas | p95 latency | `gateway_errors` rate | Throughput |
 |---|---|---|---|---|
@@ -32,9 +32,9 @@ Sourced from `k6 run load/gateway.js` against `docker compose up --scale gateway
 | Scaled-out | 1 | 2.43 s | **6.81 %** | 39.3 req/s |
 | Scaled-out | 3 | 2.15 s | **0.27 %** | 39.4 req/s |
 
-**Headline finding:** going from 1 → 3 gateway replicas reduces the `scaled_out` error rate by **~96 %** (6.81 % → 0.27 %) while leaving sustained throughput essentially unchanged (the bottleneck moves from the gateway event loop to the downstream Supabase / Redis RTT). The persistent ~25 % `http_req_failed` rate seen in both runs is the rate-limiter doing its job — 50 VUs × ~10 req/s ≈ 500 req/min vs the configured 60 req/min cap.
+Headline: going from 1 to 3 gateway replicas drops the `scaled_out` error rate by about 96 percent (6.81 to 0.27) with throughput essentially unchanged. The bottleneck moves from the gateway event loop to the downstream Supabase and Redis round-trips. The persistent ~25 percent `http_req_failed` rate is the rate limiter doing its job (50 VUs at ~10 req/s is roughly 500 req/min against a 60 req/min cap).
 
-The unexpected `baseline` p95 regression on the 3-replica run is host-CPU contention from the co-located k6 generator and is documented under "threats to validity" in the architecture report.
+The unexpected `baseline` p95 regression on the 3-replica run is host-CPU contention from the co-located k6 generator, documented under threats to validity in the architecture report.
 
 ## Reliability Mechanisms vs. Failure Modes
 

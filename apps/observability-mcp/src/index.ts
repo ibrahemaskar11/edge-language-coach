@@ -1,12 +1,15 @@
 import { config } from "dotenv";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { readFile } from "node:fs/promises";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../.env") });
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+const SAFETY_POLICY_PATH = resolve(__dirname, "../../../docs/safety-policy.md");
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? "http://localhost:3001";
 const WORKERS_URL = process.env.WORKERS_URL ?? "http://localhost:3002";
@@ -142,6 +145,32 @@ server.tool(
       .filter((l) => l.startsWith("groq_request_duration_seconds"))
       .join("\n");
     return { content: [{ type: "text", text: lines || "No Groq latency data available yet." }] };
+  },
+);
+
+server.tool(
+  "get_safety_policy",
+  "Returns the operational safety policy that bounds what this agent is allowed to do. Call this once at the start of a session before any remediation action. The returned document defines capability classes (deterministic, agentic, human in the loop), economic guardrails (tool call ceiling, inference cost ceiling), action boundaries and the rollback rule. Bind yourself to it.",
+  {},
+  async () => {
+    try {
+      const text = await readFile(SAFETY_POLICY_PATH, "utf8");
+      return { content: [{ type: "text", text }] };
+    } catch (err) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              error: "safety policy not readable",
+              path: SAFETY_POLICY_PATH,
+              details: String(err),
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
   },
 );
 
