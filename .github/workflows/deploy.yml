@@ -97,12 +97,11 @@ jobs:
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
           GHCR_ACTOR: ${{ github.actor }}
-          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
         with:
           host: ${{ secrets.ORACLE_HOST }}
           username: ubuntu
           key: ${{ secrets.ORACLE_SSH_KEY }}
-          envs: GHCR_TOKEN,GHCR_ACTOR,ADMIN_API_KEY
+          envs: GHCR_TOKEN,GHCR_ACTOR
           command_timeout: 5m
           script: |
             set -e
@@ -110,9 +109,6 @@ jobs:
             cd ~/edge-language-coach
             git fetch origin main
             git reset --hard origin/main
-            grep -q "^ADMIN_API_KEY=" .env \
-              && sed -i "s/^ADMIN_API_KEY=.*/ADMIN_API_KEY=$ADMIN_API_KEY/" .env \
-              || echo "ADMIN_API_KEY=$ADMIN_API_KEY" >> .env
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
