@@ -10,6 +10,17 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? "http://localhost:3001";
 const WORKERS_URL = process.env.WORKERS_URL ?? "http://localhost:3002";
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY ?? "";
+
+function requireAdminKey() {
+  if (!ADMIN_API_KEY) {
+    return {
+      content: [{ type: "text" as const, text: JSON.stringify({ error: "ADMIN_API_KEY is not configured." }) }],
+      isError: true as const,
+    };
+  }
+  return null;
+}
 
 function parseGauge(text: string, name: string, labels?: Record<string, string>): number | null {
   const lines = text.split("\n").filter((l) => l.startsWith(name) && !l.startsWith("#"));
@@ -32,6 +43,8 @@ server.tool(
   "Check liveness and readiness of the gateway and workers services",
   {},
   async () => {
+    const authError = requireAdminKey();
+    if (authError) return authError;
     const [gateway, workers] = await Promise.all([
       fetch(`${GATEWAY_URL}/readyz`)
         .then((r) => r.json())
@@ -51,6 +64,8 @@ server.tool(
   "Get waiting job counts for all BullMQ queues from the gateway Prometheus metrics",
   {},
   async () => {
+    const authError = requireAdminKey();
+    if (authError) return authError;
     const text = await fetch(`${GATEWAY_URL}/metrics`).then((r) => r.text());
     const flashcard = parseGauge(text, "queue_depth_total", { queue: "flashcard-generate" });
     const summary = parseGauge(text, "queue_depth_total", { queue: "summary-generate" });
@@ -74,6 +89,8 @@ server.tool(
   "Get the current state of Groq circuit breakers. State: 0=closed (healthy), 1=open (blocking), 2=half-open (testing)",
   {},
   async () => {
+    const authError = requireAdminKey();
+    if (authError) return authError;
     const text = await fetch(`${GATEWAY_URL}/metrics`).then((r) => r.text());
     const chat = parseGauge(text, "groq_circuit_breaker_state", { breaker: "chat" });
     const transcribe = parseGauge(text, "groq_circuit_breaker_state", { breaker: "transcribe" });
@@ -102,6 +119,8 @@ server.tool(
   "Get the number of currently active learning sessions (status=coaching)",
   {},
   async () => {
+    const authError = requireAdminKey();
+    if (authError) return authError;
     const text = await fetch(`${GATEWAY_URL}/metrics`).then((r) => r.text());
     const count = parseGauge(text, "active_sessions_total");
     return {
@@ -115,6 +134,8 @@ server.tool(
   "Get raw Groq API latency histogram lines from the gateway metrics (includes p50/p95/p99 bucket data)",
   {},
   async () => {
+    const authError = requireAdminKey();
+    if (authError) return authError;
     const text = await fetch(`${GATEWAY_URL}/metrics`).then((r) => r.text());
     const lines = text
       .split("\n")
