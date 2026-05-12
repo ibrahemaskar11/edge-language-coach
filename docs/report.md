@@ -14,19 +14,23 @@ We built it as three independently runnable services behind a load balancer, wit
 
 | Unit | Technology | Role |
 |---|---|---|
-| Web | React 19 + Vite, served by nginx | Single-page app, static build |
+| Web | React 19 + Vite | SPA; served by Vercel in production, nginx in local dev |
 | Gateway | Fastify 5 (Node.js 22) | REST API, auth, reliability primitives |
 | Workers | Node.js + BullMQ | Async jobs (scraper, summary, flashcard) |
 | Redis | redis:7-alpine | BullMQ queues + distributed rate-limit counters |
-| Observability | Prometheus + Grafana | Metrics scraping and dashboards |
+| Observability | Prometheus + Grafana | Metrics scraping and dashboards (local dev only) |
 
 The gateway holds no session state in memory. Every request carries a Supabase JWT, and every rate-limit counter lives in Redis. That's the property that makes horizontal scale-out a one-line change later (Section 3).
 
-The request hot path:
+Request paths differ between environments. In **local dev** (all services in Docker Compose):
 ```
 Browser → web nginx (:80) → nginx-lb (:3001) → gateway:N → Redis | Supabase | Groq
 ```
-The async path (long-running work):
+In **production**, the SPA is on Vercel and Vercel rewrites `/api/*` server-side to the Oracle backend:
+```
+Browser → Vercel (SPA + /api rewrite) → nginx-lb (:3001) → gateway:N → Redis | Supabase | Groq
+```
+The async path is the same in both environments:
 ```
 gateway → Redis (BullMQ queue) → workers → Supabase
 ```
@@ -34,7 +38,24 @@ Anything that takes more than ~2 seconds of LLM time goes onto a queue: post-ses
 
 # 2. Reliability
 
-We built five reliability primitives, each pointed at a specific failure mode we could see coming.
+## 2.0 Service Level Objectives
+
+Before building any reliability mechanism we defined measurable targets — SLOs — against which the system can be evaluated. An **SLI** (Service Level Indicator) is the metric we measure; an **SLO** (Service Level Objective) is the target we commit to for that metric.
+
+| SLI | SLO | Measurement window |
+|---|---|---|
+| API availability (`1 − rate(5xx)`) | ≥ 99 % | Rolling 5 min |
+| `/api/messages` p95 latency | < 2 s | Rolling 5 min |
+| `/api/topics` p95 latency | < 500 ms | Rolling 5 min |
+| `/readyz` availability | 100 % | Continuous |
+| Queue job success rate | ≥ 95 % | Per day |
+| Scraper freshness | ≥ 5 new topics | Per day |
+
+The full k6 measured results against these targets are in [`docs/slo-table.md`](./slo-table.md). Headline: at 50 VUs the error rate dropped from **6.81 % → 0.27 %** (−96 %) by adding two gateway replicas, while meeting the latency SLO at baseline (0.34 s p95 vs the 2 s target).
+
+## 2.1 Reliability primitives
+
+We built five reliability mechanisms, each pointed at a specific failure mode we could see coming.
 
 | Primitive | Code location | Failure addressed |
 |---|-----|---|
@@ -44,7 +65,7 @@ We built five reliability primitives, each pointed at a specific failure mode we
 | Dead-letter logging | `apps/workers/src/index.ts` | A job failing past its retry budget |
 | Scraper idempotency key in Redis | `apps/workers/src/jobs/scraper.job.ts` | Duplicate work after a worker restart |
 
-## 2.1 Circuit breaker — measured behaviour
+## 2.2 Circuit breaker — measured behaviour
 
 To check the breaker actually does what it's supposed to, we wrote a small mock Groq server (`mocks/groq-mock.mjs`) that we can put into "slow" mode (30 s sleep on every request, well past the 15 s breaker timeout). Then a driver script (`mocks/breaker-driver.mjs`) fired 60 requests at concurrency 12 against the gateway. The full output is at `load/breaker-demo-output.txt`. Summary:
 
@@ -58,13 +79,13 @@ The headline number is the latency cliff: 15,300 ms → 25 ms between adjacent c
 
 The breaker state is also exposed as a Prometheus gauge (`groq_circuit_breaker_state`), so the closed → open → half-open transitions show up live on the Grafana dashboard while the demo is running.
 
-## 2.2 Other primitives (summary)
+## 2.3 Other primitives (summary)
 
 - **Rate limit:** 60 requests/minute per authenticated user, 60/minute per IP otherwise. The counters live in Redis (`@fastify/rate-limit` Redis store), so the limit is shared across gateway replicas — no sticky sessions needed. Health probes are allow-listed.
 - **Retries:** All BullMQ workers use `attempts: 3, backoff: { type: 'exponential', delay: 5000 }`. After three failed attempts the job is logged at `error` level with `dlq: true` and shows up in the Bull Board UI at `:3002/queues`.
 - **Idempotency:** The scraper sets a Redis key `scraper:slot:<date>:<6h-window>` on success, with TTL = 6 h. A second invocation in the same window is a no-op, so if a worker crashes mid-scrape and the job is replayed, we don't get duplicate topics.
 
-## 2.3 Tests in CI
+## 2.4 Tests in CI
 
 The reliability story above isn't only asserted in prose — the gateway has a small Vitest suite (Fastify `inject()` harness, Redis / Supabase / Groq mocked at module boundaries) that pins the readiness contract: `/livez` returns 200, `/readyz` returns 200 when deps are up, and `/readyz` returns 503 with the failing dependency named in the body when Redis or Groq go down. CI runs `pnpm turbo test` ahead of typecheck and build on every push and PR, so a regression in the failure paths fails the pipeline. Source: [`apps/gateway/src/__tests__/health.test.ts`](../apps/gateway/src/__tests__/health.test.ts). Breaker, rate-limit, and queue-retry tests are the natural next additions.
 
