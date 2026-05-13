@@ -9,28 +9,28 @@ const topics = [
     description:
       "Parlami della tua famiglia. Quante persone siete? Hai fratelli o sorelle? Dove abita la tua famiglia? Cosa fate insieme di solito?",
     level: "A1",
-    category: "lifestyle",
+    category: "DailyLife",
   },
   {
     title: "Una giornata tipica",
     description:
       "Descrivi una tua giornata normale. A che ora ti svegli? Cosa mangi a colazione? Cosa fai durante il giorno? A che ora vai a dormire?",
     level: "A1",
-    category: "lifestyle",
+    category: "DailyLife",
   },
   {
     title: "Il cibo che mi piace",
     description:
       "Qual è il tuo cibo preferito? Cosa mangi di solito a pranzo e a cena? Sai cucinare? Preferisci mangiare al ristorante o a casa?",
     level: "A1",
-    category: "culture",
+    category: "Food",
   },
   {
     title: "Il mio tempo libero",
     description:
       "Cosa ti piace fare nel tuo tempo libero? Hai degli hobby? Guardi la televisione, leggi libri, fai sport? Con chi passi il tempo libero?",
     level: "A1",
-    category: "lifestyle",
+    category: "DailyLife",
   },
   // ── A2 ──────────────────────────────────────────────────────────
   {
@@ -38,28 +38,28 @@ const topics = [
     description:
       "Dove ti piace andare in vacanza? Preferisci il mare o la montagna? Racconta dell'ultima vacanza che hai fatto: dove sei andato, con chi e cosa hai fatto.",
     level: "A2",
-    category: "lifestyle",
+    category: "Travel",
   },
   {
     title: "Imparare l'italiano",
     description:
       "Perché hai deciso di studiare l'italiano? Da quanto tempo lo studi? Cosa è facile e cosa è difficile per te? Hai mai visitato l'Italia?",
     level: "A2",
-    category: "education",
+    category: "Society",
   },
   {
     title: "La mia città",
     description:
       "Com'è la città in cui vivi? È grande o piccola? Cosa si può fare? Ci sono posti belli da vedere? Ti piace vivere lì o preferiresti abitare altrove?",
     level: "A2",
-    category: "lifestyle",
+    category: "DailyLife",
   },
   {
     title: "Il fine settimana scorso",
     description:
       "Cosa hai fatto lo scorso fine settimana? Sei uscito con gli amici, sei rimasto a casa, hai viaggiato? Racconta com'è andata la tua giornata preferita.",
     level: "A2",
-    category: "lifestyle",
+    category: "DailyLife",
   },
   // ── B2 / C1 ─────────────────────────────────────────────────────
   {
@@ -67,56 +67,56 @@ const topics = [
     description:
       "Molte aziende stanno adottando il lavoro da remoto in modo permanente. Secondo te, quali sono i vantaggi e gli svantaggi di lavorare da casa? Come cambierà il mondo del lavoro nei prossimi dieci anni?",
     level: "B2",
-    category: "technology",
+    category: "Technology",
   },
   {
     title: "L'intelligenza artificiale nella vita quotidiana",
     description:
       "L'intelligenza artificiale sta diventando sempre più presente nella nostra vita quotidiana, dai suggerimenti di Netflix agli assistenti vocali. Pensi che l'IA migliori la qualità della vita o che ci renda troppo dipendenti dalla tecnologia?",
     level: "B2",
-    category: "technology",
+    category: "Technology",
   },
   {
     title: "La cucina italiana e l'identità culturale",
     description:
       "La cucina italiana è famosa in tutto il mondo, ma spesso viene modificata per adattarsi ai gusti locali. Cosa ne pensi della 'carbonara con la panna' o della 'pizza hawaiana'? È importante preservare le ricette tradizionali o l'evoluzione è naturale?",
     level: "B2",
-    category: "culture",
+    category: "Food",
   },
   {
     title: "Vivere all'estero: sfide e opportunità",
     description:
       "Trasferirsi in un altro paese comporta molte sfide: la lingua, la burocrazia, la nostalgia di casa. Hai mai vissuto o vorresti vivere all'estero? Quali sono secondo te le difficoltà principali e come si possono superare?",
     level: "B2",
-    category: "lifestyle",
+    category: "Travel",
   },
   {
     title: "Il cambiamento climatico e le scelte individuali",
     description:
       "Alcuni sostengono che le azioni individuali, come ridurre il consumo di carne o usare meno plastica, possano fare la differenza nella lotta al cambiamento climatico. Altri pensano che solo i governi e le grandi aziende possano avere un impatto reale. Tu cosa ne pensi?",
     level: "C1",
-    category: "environment",
+    category: "Society",
   },
   {
     title: "I social media e la salute mentale",
     description:
       "I social media ci permettono di restare connessi, ma diversi studi collegano l'uso eccessivo a problemi di ansia e autostima, soprattutto tra i giovani. Come gestisci il tuo rapporto con i social? Pensi che servano delle regole più severe?",
     level: "B2",
-    category: "society",
+    category: "Society",
   },
   {
     title: "Il sistema universitario italiano",
     description:
       "Il sistema universitario italiano è molto diverso da quello di altri paesi: esami orali, nessun limite di tempo per laurearsi, e il voto di laurea su 110. Quali sono i punti di forza e le debolezze di questo sistema rispetto ad altri che conosci?",
     level: "C1",
-    category: "education",
+    category: "Society",
   },
   {
     title: "Viaggiare da soli: libertà o solitudine?",
     description:
       "Viaggiare da soli sta diventando sempre più popolare. C'è chi lo considera un'esperienza di crescita personale e chi lo trova poco sicuro o troppo solitario. Raccontami la tua opinione ed eventualmente un'esperienza di viaggio che ti ha segnato.",
     level: "B2",
-    category: "lifestyle",
+    category: "Travel",
   },
 ];
 
