@@ -24,6 +24,7 @@ const args = [
   input,
   "-o", output,
   "--pdf-engine=xelatex",
+  "--resource-path=docs",
   "--toc",
   "-V", "geometry:margin=1in",
   "-V", "fontsize=11pt",

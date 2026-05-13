@@ -22,25 +22,9 @@ We built it as three independently runnable services behind a load balancer, wit
 
 The gateway holds no session state in memory. Every request carries a Supabase JWT and every rate-limit counter lives in Redis. That is what makes horizontal scale-out a one-line change later (Section 3).
 
-Request paths differ between environments. In local dev:
+![**Figure 1 — Container topology (local dev).** In production, Vercel hosts the SPA and rewrites `/api/*` to `nginx-lb`; everything from `nginx-lb` rightward is identical. Prometheus and Grafana run only in local dev.](./diagrams/c4-l2-container.png){width=90%}
 
-```
-Browser → web nginx (:80) → nginx-lb (:3001) → gateway:N → Redis | Supabase | Groq
-```
-
-In production, the SPA is on Vercel and Vercel rewrites `/api/*` server-side to the Oracle backend:
-
-```
-Browser → Vercel (SPA + /api rewrite) → nginx-lb (:3001) → gateway:N → Redis | Supabase | Groq
-```
-
-The async path is the same in both:
-
-```
-gateway → Redis (BullMQ queue) → workers → Supabase
-```
-
-Anything that takes more than about 2 s of LLM time goes onto a queue (post-session summaries, flashcard pack generation, the periodic topic scrape).
+Anything that takes more than about 2 s of LLM time runs async: the gateway enqueues onto Redis (BullMQ) and a worker pool consumes, writes to Supabase and calls Groq independently. Post-session summaries, flashcard pack generation and the periodic topic scrape all flow this way.
 
 # 2. Reliability
 
@@ -186,6 +170,8 @@ The two servers are split by privilege.
 |---|---|---|---|
 | `observability-mcp` | Read only over `/metrics`, `/readyz` and the safety policy file | `get_service_health`, `get_queue_metrics`, `get_circuit_breaker_state`, `get_active_sessions`, `get_groq_latency`, `get_safety_policy` | None (stdio, locally scoped) |
 | `remediation-mcp` | Guarded mutations on Redis and the gateway admin route | `pause_queue`, `resume_queue`, `reset_circuit_breaker`, `flush_dead_letter_queue` | Layered: `zod.enum` queue allow-list, `ADMIN_API_KEY` for breaker reset, `confirm: true` for the irreversible flush, structured stderr audit log on every call |
+
+![**Figure 2 — Operator surface.** A separate plane from the user-request data flow. The two MCP servers are split by privilege: `observability-mcp` is read-only over `/metrics` and `/readyz`; `remediation-mcp` mutates Redis and the gateway admin route under layered guards. Every call leaves a structured audit line on stderr.](./diagrams/c4-l2b-operator-surface.png){width=90%}
 
 When the breaker demo trips the chat breaker, recovering becomes a three-step dialogue: call `get_circuit_breaker_state` to confirm the breaker is open, check that Groq is healthy again, then call `reset_circuit_breaker` to close it. Every action leaves an audit line on stderr (stdout is reserved for the MCP transport).
 
