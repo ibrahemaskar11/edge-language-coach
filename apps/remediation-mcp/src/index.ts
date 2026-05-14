@@ -25,16 +25,6 @@ function audit(tool: string, args: unknown, result: string) {
   log.info({ tool, args, result, ts: new Date().toISOString() }, "remediation");
 }
 
-function requireAdminKey() {
-  if (!ADMIN_API_KEY) {
-    return {
-      content: [{ type: "text" as const, text: JSON.stringify({ error: "ADMIN_API_KEY is not configured." }) }],
-      isError: true as const,
-    };
-  }
-  return null;
-}
-
 function redisClient() {
   return new IORedis(REDIS_URL, { maxRetriesPerRequest: 1, lazyConnect: true });
 }
@@ -46,8 +36,6 @@ server.tool(
   "Pause a BullMQ queue — workers stop picking up new jobs. Safe to run at any time.",
   { name: z.enum(VALID_QUEUES) },
   async ({ name }) => {
-    const authError = requireAdminKey();
-    if (authError) return authError;
     const redis = redisClient();
     try {
       await new Queue(name, { connection: redis }).pause();
@@ -64,8 +52,6 @@ server.tool(
   "Resume a paused BullMQ queue — workers start picking up jobs again.",
   { name: z.enum(VALID_QUEUES) },
   async ({ name }) => {
-    const authError = requireAdminKey();
-    if (authError) return authError;
     const redis = redisClient();
     try {
       await new Queue(name, { connection: redis }).resume();
@@ -82,8 +68,6 @@ server.tool(
   "Force-close the Groq circuit breakers back to closed (healthy) state. Use when Groq has recovered but the breaker is still open.",
   {},
   async () => {
-    const authError = requireAdminKey();
-    if (authError) return authError;
     const res = await fetch(`${GATEWAY_URL}/admin/breakers/reset`, {
       method: "POST",
       headers: { "x-admin-key": ADMIN_API_KEY },
@@ -102,8 +86,6 @@ server.tool(
   "Remove all failed jobs from a queue. IRREVERSIBLE — requires confirm: true.",
   { name: z.enum(VALID_QUEUES), confirm: z.boolean() },
   async ({ name, confirm }) => {
-    const authError = requireAdminKey();
-    if (authError) return authError;
     if (!confirm) {
       return {
         content: [

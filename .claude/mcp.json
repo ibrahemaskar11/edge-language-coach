@@ -6,11 +6,21 @@
   "observability": {
     "type": "stdio",
     "command": "node",
-    "args": ["apps/observability-mcp/dist/index.js"]
+    "args": ["apps/observability-mcp/dist/index.js"],
+    "env": {
+      "ADMIN_API_KEY": "<your-admin-api-key>",
+      "GATEWAY_URL": "http://localhost:3001",
+      "WORKERS_URL": "http://localhost:3002"
+    }
   },
   "remediation": {
     "type": "stdio",
     "command": "node",
-    "args": ["apps/remediation-mcp/dist/index.js"]
+    "args": ["apps/remediation-mcp/dist/index.js"],
+    "env": {
+      "ADMIN_API_KEY": "<your-admin-api-key>",
+      "GATEWAY_URL": "http://localhost:3001",
+      "REDIS_URL": "redis://localhost:6379"
+    }
   }
 }

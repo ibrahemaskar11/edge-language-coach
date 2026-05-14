@@ -34,6 +34,7 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY}
       - GROQ_BASE_URL=${GROQ_BASE_URL:-}
       - DEMO_MODE=${DEMO_MODE:-}
+      - ADMIN_API_KEY=${ADMIN_API_KEY}
       - PORT=3001
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -79,7 +80,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.5.2
     ports:
       - "3000:3000"
     environment:

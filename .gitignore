@@ -17,6 +17,7 @@ supabase/.temp/
 
 # MCP
 .mcp.json
+.claude/mcp.json
 
 # OS
 .DS_Store

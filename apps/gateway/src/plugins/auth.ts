@@ -20,7 +20,8 @@ export const authPlugin = fp(async (fastify: FastifyInstance) => {
         request.url === "/readyz" ||
         request.url === "/metrics" ||
         request.url.startsWith("/api/auth/callback") ||
-        request.url.startsWith("/api/breaker-demo")
+        request.url.startsWith("/api/breaker-demo") ||
+        request.url.startsWith("/admin")
       ) {
         return;
       }
