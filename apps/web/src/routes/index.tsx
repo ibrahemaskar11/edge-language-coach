@@ -134,7 +134,7 @@ function LandingPage() {
     <div className="bg-[#0C0C0C] text-[#F0EDE8]">
 
       {/* ── STICKY NAV ── */}
-      <nav className="sticky top-0 z-50 flex h-[68px] items-center border-b border-[#1E1E1E] bg-[#0C0C0C]/90 px-10 backdrop-blur-md md:px-20">
+      <nav className="sticky top-0 z-50 flex h-[68px] items-center border-b border-[#1E1E1E] bg-[#0C0C0C]/90 px-4 backdrop-blur-md sm:px-8 md:px-20">
         <img src="/logo-dark.svg" className="h-8 w-8 shrink-0" alt="edge"/>
         {/* Absolutely centered links */}
         <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-10 md:flex">
@@ -174,11 +174,11 @@ function LandingPage() {
         <div className="pointer-events-none absolute bottom-0 left-20 top-0 w-px bg-gradient-to-b from-transparent via-[#C9A96E]/10 to-transparent"/>
 
         {/* Content */}
-        <div className="relative px-10 py-28 md:px-20">
+        <div className="relative px-4 py-16 sm:px-8 md:px-20 md:py-28">
           <p className="mb-8 font-mono text-xs uppercase tracking-[0.14em] text-[#C9A96E]">
             AI Language Coach — Italian
           </p>
-          <h1 className="max-w-3xl text-[68px] font-black leading-[1.02] tracking-[-3px] md:text-[88px]">
+          <h1 className="max-w-3xl text-[38px] font-black leading-[1.08] tracking-[-1px] sm:text-[54px] sm:tracking-[-2px] md:text-[88px] md:leading-[1.02] md:tracking-[-3px]">
             Speak Italian<br/>with confidence.
           </h1>
           <p className="mt-9 max-w-lg text-lg font-light leading-8 text-[#8A8480]">
@@ -213,7 +213,7 @@ function LandingPage() {
       ══════════════════════════════════════ */}
       <section
         id="how"
-        className="relative overflow-hidden border-t border-[#1E1E1E] px-10 py-24 md:px-20"
+        className="relative overflow-hidden border-t border-[#1E1E1E] px-4 py-16 sm:px-8 md:px-20 md:py-24"
       >
         <Rings className="pointer-events-none absolute -bottom-56 -left-56"/>
         <Dots  className="pointer-events-none absolute bottom-10 left-8 opacity-60"/>
@@ -222,9 +222,9 @@ function LandingPage() {
         <div className="reveal relative mb-14 flex flex-wrap items-end justify-between gap-6">
           <div>
             <p className="mb-5 font-mono text-xs uppercase tracking-[0.14em] text-[#C9A96E]">How it works</p>
-            <h2 className="text-5xl font-extrabold tracking-[-1.5px]">Three steps to fluency.</h2>
+            <h2 className="text-4xl font-extrabold tracking-tight md:text-5xl md:tracking-[-1.5px]">Three steps to fluency.</h2>
           </div>
-          <p className="max-w-xs text-right text-[15px] leading-7 text-[#555150]">
+          <p className="max-w-xs text-left text-[15px] leading-7 text-[#555150] md:text-right">
             Each session is a focused, guided conversation. No grammar drills. No passive watching.
           </p>
         </div>
@@ -251,7 +251,7 @@ function LandingPage() {
       ══════════════════════════════════════ */}
       <section
         id="features"
-        className="relative overflow-hidden border-t border-[#1E1E1E] px-10 py-24 md:px-20"
+        className="relative overflow-hidden border-t border-[#1E1E1E] px-4 py-16 sm:px-8 md:px-20 md:py-24"
       >
         <Rings className="pointer-events-none absolute -right-56 -top-44"/>
         <Dots  className="pointer-events-none absolute right-10 top-10 opacity-70"/>
@@ -259,7 +259,7 @@ function LandingPage() {
 
         <div className="reveal relative mb-14">
           <p className="mb-5 font-mono text-xs uppercase tracking-[0.14em] text-[#C9A96E]">Features</p>
-          <h2 className="text-5xl font-extrabold tracking-[-1.5px]">
+          <h2 className="text-4xl font-extrabold tracking-tight md:text-5xl md:tracking-[-1.5px]">
             Everything you need<br/>to actually improve.
           </h2>
         </div>
@@ -287,14 +287,14 @@ function LandingPage() {
       ══════════════════════════════════════ */}
       <section
         id="progress"
-        className="relative overflow-hidden border-t border-[#1E1E1E] px-10 py-24 md:px-20"
+        className="relative overflow-hidden border-t border-[#1E1E1E] px-4 py-16 sm:px-8 md:px-20 md:py-24"
       >
         <Rings className="pointer-events-none absolute -bottom-56 -left-56"/>
         <div className="pointer-events-none absolute bottom-0 right-20 top-0 w-px bg-gradient-to-b from-transparent via-[#C9A96E]/8 to-transparent"/>
 
         <div className="reveal relative flex flex-col items-start gap-12 lg:flex-row lg:items-center lg:gap-20">
           <div className="flex flex-1 flex-col gap-7">
-            <p className="text-3xl font-extrabold leading-tight tracking-[-1.2px] md:text-[40px] md:leading-[48px]">
+            <p className="text-2xl font-extrabold leading-tight tracking-[-0.5px] sm:text-3xl md:text-[40px] md:tracking-[-1.2px] md:leading-[48px]">
               "The feedback is instant and honest. After three weeks I was holding conversations I couldn't have had before."
             </p>
             <div className="flex items-center gap-4">
@@ -347,13 +347,13 @@ function LandingPage() {
           SECTION 5 — CTA
       ══════════════════════════════════════ */}
       <section
-        className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden border-t border-[#1E1E1E] px-10 py-28 text-center md:px-20"
+        className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden border-t border-[#1E1E1E] px-4 py-20 text-center sm:px-8 md:px-20 md:py-28"
       >
         <Rings className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-50"/>
 
         <div className="reveal relative">
           <p className="mb-6 font-mono text-xs uppercase tracking-[0.14em] text-[#C9A96E]">Begin today</p>
-          <h2 className="mx-auto mb-5 max-w-2xl text-[60px] font-black leading-[1.05] tracking-[-2.5px] md:text-[72px]">
+          <h2 className="mx-auto mb-5 max-w-2xl text-[34px] font-black leading-[1.1] tracking-[-0.5px] sm:text-[48px] sm:tracking-[-1.5px] md:text-[72px] md:leading-[1.05] md:tracking-[-2.5px]">
             Your next session is one click away.
           </h2>
           <p className="mx-auto mb-10 max-w-sm text-base leading-7 text-[#555150]">

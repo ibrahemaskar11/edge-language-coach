@@ -102,9 +102,9 @@ function TopicsPage() {
       {!filteredTopics.length ? (
         <p className="text-sm text-muted-foreground">No topics match the selected filters.</p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {filteredTopics.map((topic) => (
-            <Link key={topic.id} to="/playground/topics/$topicId" params={{ topicId: topic.id }}>
+            <Link key={topic.id} to="/playground/topics/$topicId" params={{ topicId: topic.id }} className="block">
               <Card className="border-border/50 transition-colors hover:bg-accent/50">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between">

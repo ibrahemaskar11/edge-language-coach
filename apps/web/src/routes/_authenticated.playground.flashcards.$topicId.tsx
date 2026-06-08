@@ -61,7 +61,7 @@ function FlashcardReviewPage() {
         &larr; Back to Flashcards
       </Link>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-3xl font-bold tracking-tight">
           {topic?.title ?? "Loading..."}
         </h1>
@@ -117,25 +117,25 @@ function FlashcardReviewPage() {
           </Card>
 
           {revealed && (
-            <div className="flex gap-3">
+            <div className="flex w-full max-w-lg gap-2">
               <Button
                 variant="outline"
                 onClick={() => handleRate("hard")}
-                className="w-28 text-red-400 hover:text-red-400"
+                className="flex-1 text-red-400 hover:text-red-400"
               >
                 Hard
               </Button>
               <Button
                 variant="outline"
                 onClick={() => handleRate("good")}
-                className="w-28 text-yellow-400 hover:text-yellow-400"
+                className="flex-1 text-yellow-400 hover:text-yellow-400"
               >
                 Good
               </Button>
               <Button
                 variant="outline"
                 onClick={() => handleRate("easy")}
-                className="w-28 text-green-400 hover:text-green-400"
+                className="flex-1 text-green-400 hover:text-green-400"
               >
                 Easy
               </Button>

@@ -63,12 +63,13 @@ function FlashcardsPage() {
         {!decks?.length ? (
           <p className="text-sm text-muted-foreground">No flashcard decks yet.</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {decks.map((deck) => (
               <Link
                 key={deck.topicId}
                 to="/playground/flashcards/$topicId"
                 params={{ topicId: deck.topicId }}
+                className="block"
               >
                 <Card className="border-border/50 transition-colors hover:bg-accent/50">
                   <CardContent className="p-5">

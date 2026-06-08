@@ -100,27 +100,29 @@ function ReportsPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="border-border/50">
-            <CardContent className="divide-y divide-border/50 p-0">
-              {reports.map((report) => (
-                <Link
-                  key={report.weekId}
-                  to="/playground/reports/$reportId"
-                  params={{ reportId: report.weekId }}
-                  className="flex items-center justify-between px-5 py-3 transition-colors hover:bg-accent/50"
-                >
-                  <span className="text-sm text-muted-foreground">
-                    {report.weekLabel} &middot; {report.sessionCount}{" "}
-                    {report.sessionCount === 1 ? "session" : "sessions"} &middot;{" "}
-                    {report.completedCount} completed
-                  </span>
-                  <span className="shrink-0 text-sm text-muted-foreground">
-                    View <ArrowRight className="inline h-3 w-3" />
-                  </span>
-                </Link>
-              ))}
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            {reports.map((report) => (
+              <Link
+                key={report.weekId}
+                to="/playground/reports/$reportId"
+                params={{ reportId: report.weekId }}
+                className="block"
+              >
+                <Card className="border-border/50 transition-colors hover:bg-accent/50">
+                  <CardContent className="flex items-center justify-between p-5">
+                    <span className="text-sm text-muted-foreground">
+                      {report.weekLabel} &middot; {report.sessionCount}{" "}
+                      {report.sessionCount === 1 ? "session" : "sessions"} &middot;{" "}
+                      {report.completedCount} completed
+                    </span>
+                    <span className="shrink-0 text-sm text-muted-foreground">
+                      View <ArrowRight className="inline h-3 w-3" />
+                    </span>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
         )}
       </section>
     </div>

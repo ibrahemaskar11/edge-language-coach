@@ -40,12 +40,13 @@ function ChatsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {sessions.map((session) => (
             <Link
               key={session.id}
               to="/playground/chats/$sessionId"
               params={{ sessionId: session.id }}
+              className="block"
             >
               <Card className="border-border/50 transition-colors hover:bg-accent/50">
                 <CardContent className="p-5">
