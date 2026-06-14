@@ -135,7 +135,7 @@ async function extractTopic(title: string, description: string): Promise<TopicEx
       { role: "system", content: TOPIC_SYSTEM_PROMPT },
       { role: "user", content: `Article title: ${title}\n\nArticle summary: ${description}` },
     ],
-    temperature: 0.7,
+    temperature: 0.2,
     response_format: { type: "json_object" },
   });
 
@@ -145,6 +145,16 @@ async function extractTopic(title: string, description: string): Promise<TopicEx
 
 // ─── Deduplication ────────────────────────────────────────
 
+function tokenOverlap(a: string, b: string): number {
+  const stopwords = new Set(["di", "del", "della", "il", "la", "i", "le", "un", "una", "in", "e", "a", "per", "da", "su", "con"]);
+  const tokA = new Set(a.split(/\s+/).filter((w) => w.length > 2 && !stopwords.has(w)));
+  const tokB = new Set(b.split(/\s+/).filter((w) => w.length > 2 && !stopwords.has(w)));
+  if (tokA.size === 0 || tokB.size === 0) return 0;
+  let shared = 0;
+  for (const w of tokA) if (tokB.has(w)) shared++;
+  return shared / Math.min(tokA.size, tokB.size);
+}
+
 function isDuplicate(newTitle: string, existing: string[]): boolean {
   const norm = newTitle.toLowerCase().trim();
   for (const t of existing) {
@@ -153,6 +163,7 @@ function isDuplicate(newTitle: string, existing: string[]): boolean {
     if ((norm.startsWith(e) || e.startsWith(norm)) && Math.abs(norm.length - e.length) < 20) {
       return true;
     }
+    if (tokenOverlap(norm, e) >= 0.8) return true;
   }
   return false;
 }
@@ -205,9 +216,12 @@ export async function runScraper(log: Logger): Promise<void> {
   const slotKey = currentSlotKey();
   const alreadyRan = await connection.get(slotKey);
   if (alreadyRan) {
-    log.info({ slotKey }, "scraper already completed this slot — skipping");
+    log.info({ slotKey }, "scraper already ran or is running this slot — skipping");
     return;
   }
+
+  // Claim the slot immediately so concurrent retries/workers skip this run
+  await connection.set(slotKey, "running", "EX", SCRAPER_SLOT_TTL);
 
   log.info("starting scraper run");
   const db = createServiceClient();
@@ -276,9 +290,6 @@ export async function runScraper(log: Logger): Promise<void> {
   }
 
   log.info({ inserted, skipped }, "scraper complete");
-
-  // Mark this slot as done so retries within the same window are no-ops
-  await connection.set(slotKey, "1", "EX", SCRAPER_SLOT_TTL);
 
   // Re-score and rotate the active topic pool
   await runRotator(log);
