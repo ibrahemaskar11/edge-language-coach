@@ -1,122 +1,102 @@
 # 00. Open Questions — resolve before implementation
 
-Every `⚠️ CONFIRM` in this guide, collected in one place. Work through this with the
-web and backend owners **before** starting mobile implementation; most of these change
-what gets built, not just what it is called.
+Every `⚠️ CONFIRM` in this guide, in one place.
 
-Fill in the **Answer** column and check the box. An unchecked row is a known unknown,
-not a detail to figure out during coding.
+The first version of this checklist had 61 items. **Reading the codebase answered 30 of
+them** — those are now recorded as ✅ facts in the guide rather than questions. What
+remains below are genuine decisions nobody has made yet, plus a few settings that live
+in the Supabase dashboard rather than in the repository.
 
----
-
-## Cross-cutting
-
-| # | Question | Ask | Answer |
-|---|----------|-----|--------|
-| 1 | Exact error envelope shape and the full list of stable `code` values | Backend | |
-| 2 | Password policy rules, exactly as the web validator enforces them | Web | |
-| 3 | Unicode normalization applied to passwords (NFC?) | Backend | |
-| 4 | Analytics event names already emitted by web, so funnels join | Web / Data | |
-| 5 | Does the backend send transactional emails for password reset, password change, deletion, deactivation? | Backend | |
-| 6 | Is TLS pinning in use, and does it cover auth routes? | Mobile / Backend | |
-
-## 1 · Forgot Password
-
-| # | Question | Ask | Answer |
-|---|----------|-----|--------|
-| 7 | Reset link URL pattern and token query-parameter name | Backend | |
-| 8 | Token TTL, and is it single-use? | Backend | |
-| 9 | Are `apple-app-site-association` and `assetlinks.json` served for the reset path? Who owns that config? | Web / Infra | |
-| 10 | Does a validate-token-only endpoint exist? | Backend | |
-| 11 | On successful reset — auto sign-in, or return to login? | Web | |
-| 12 | Are all other sessions revoked on reset? | Backend | |
-| 13 | Requesting a reset twice — does the newest token invalidate older ones? | Backend | |
-| 14 | Behavior for a deactivated account | Product | |
-| 15 | Behavior for a deleted account / one in the grace period | Product | |
-| 16 | What is emailed to an OAuth-only account that requests a reset? | Backend | |
-
-## 2 · Change Password
-
-| # | Question | Ask | Answer |
-|---|----------|-----|--------|
-| 17 | How does the API report whether an account has a password? (`hasPassword`, linked providers, …) | Backend | |
-| 18 | Does a set-initial-password endpoint exist for OAuth-only accounts? | Backend | |
-| 19 | **Session model after change:** keep this session and revoke others, or revoke all? | Web | |
-| 20 | Does the response rotate and return new tokens? | Backend | |
-| 21 | **How is "wrong current password" distinguished from "expired access token"?** Both are `401` — is there a distinguishing `code`, or can wrong-password return `403`? | Backend | |
-| 22 | Is a recent-password-reuse check enforced? | Backend | |
-| 23 | Does the backend support a step-up / biometric attestation, or is the password sent directly? | Backend | |
-
-## 3 · Delete Account
-
-| # | Question | Ask | Answer |
-|---|----------|-----|--------|
-| 24 | **Immediate deletion, or soft with a grace period? If soft, how many days?** | Product | |
-| 25 | What is actually deleted vs. anonymized vs. retained? (needed to write truthful copy) | Backend / Legal | |
-| 26 | Messages in group conversations — deleted, or retained as "Deleted user"? | Product | |
-| 27 | What is retained for legal/fraud/accounting reasons, and for how long? | Legal | |
-| 28 | Does an active subscription block deletion? | Product | |
-| 29 | Does a data-export feature exist to offer before deletion? | Product | |
-| 30 | Re-auth mechanism: password in the delete body, or a short-lived re-auth token? | Backend | |
-| 31 | Re-auth for OAuth accounts — does the backend accept a fresh provider token? | Backend | |
-| 32 | Is deletion idempotent, so a retry after a dropped connection succeeds? | Backend | |
-| 33 | Sole group owner — block with transfer, auto-transfer, or dissolve? | Product | |
-| 34 | Re-registering with the same email after deletion — allowed? | Product | |
-| 35 | Final-confirmation mechanism: typed word or hold-to-confirm? If typed, what word, and is it localized? | Web | |
-| 36 | Reason codes used by web | Web | |
-| 37 | Signing in during the grace period — auto-restore or confirm first? | Product | |
-
-## 4 · Deactivate Account
-
-| # | Question | Ask | Answer |
-|---|----------|-----|--------|
-| 38 | **The full semantics table** in [`04-deactivate-account.md`](./04-deactivate-account.md#semantics--settle-these-first) — every row | Product | |
-| 39 | Does web require re-authentication to deactivate? | Web | |
-| 40 | Does the product offer a deactivation **duration**? | Product | |
-| 41 | Reactivation model: explicit prompt (A) or silent on sign-in (B)? | Backend / Product | |
-| 42 | Does login return a distinguishable `ACCOUNT_DEACTIVATED` response plus a scoped reactivation token? | Backend | |
-| 43 | **How does the API represent a deactivated user in responses — omitted, or a stub?** This determines client work across every screen that renders a user | Backend | |
-| 44 | Per-surface rendering of deactivated users: feed, comments, friends list, search, 1:1 chat, group member list, profile deep link | Web | |
-| 45 | Are notifications accumulated during deactivation replayed on return? | Backend | |
-| 46 | Is there an auto-delete after N days of deactivation? | Product | |
-| 47 | Pending friend requests during deactivation — hidden and restored? | Backend | |
-
-## 5 · Friends Suggestion in Feed
-
-| # | Question | Ask | Answer |
-|---|----------|-----|--------|
-| 48 | **Feed injection cadence** — first position and interval, and max blocks per session | Web | |
-| 49 | Minimum suggestion count below which nothing renders | Web | |
-| 50 | Horizontal carousel or vertical stack? | Web / Design | |
-| 51 | After adding — does the card stay showing `Requested`, or animate out? | Web | |
-| 52 | Is add optimistic on web? (prior web work measured ~120ms optimistic updates) | Web | |
-| 53 | Dismiss endpoint, and does it persist server-side across devices? | Backend | |
-| 54 | Does a "See all" suggestions screen exist on web? | Web | |
-| 55 | Which ranking signals exist, and what `reason` types can the API return? | Backend | |
-| 56 | Is `reason` returned as a structured object, or a prebuilt English string? (must be structured for localization) | Backend | |
-| 57 | Suggestions cache TTL | Backend | |
-| 58 | Are contact-based suggestions in scope? If so, consent flow and store-disclosure owner | Product | |
-| 59 | May mutual-friend avatars be shown when that friend's list is private? | Product / Legal | |
-| 60 | Additional exclusion rules beyond self / friend / pending / blocked / dismissed / deactivated | Product | |
-| 61 | Does web track impressions, and with what thresholds? | Web / Data | |
+Fill in **Answer** and check the box. An unchecked row is a known unknown, not a detail
+to work out during coding.
 
 ---
 
-## Highest-risk unknowns
+## 🔴 Blocking — nothing ships until these are decided
 
-If time is short, resolve these six first — each one changes the shape of the
-implementation rather than a label:
+| # | Question | Ask | Answer |
+|---|----------|-----|--------|
+| 1 | **Is there a settings surface at all?** None exists — no `/settings` route, no account section in the sidebar. Features 2, 3, and 4 all live in one, so its IA is a shared prerequisite | Design | |
+| 2 | **Hard delete or soft delete with a grace period?** Changes schema, route, copy, and whether a purge worker is needed. [Recommendation: hard delete](./03-delete-account.md#-confirm-first-hard-delete-or-soft-delete) | Product | |
+| 3 | **How does a client distinguish "wrong password" from "expired token"?** `authPlugin` already returns `401` for expired tokens (`plugins/auth.ts:42`). Without a `code` field or a `403`, a typo signs the user out | Backend | |
+| 4 | **Re-auth mechanism.** Supabase's `updateUser` does not verify the current password. [Option A vs B](./02-change-password.md#-the-critical-gap-supabase-does-not-verify-the-current-password) — recommend B, gateway-verified | Backend | |
+| 5 | **Custom scheme or universal links** for the password-reset deep link? Universal links need `apple-app-site-association` + `assetlinks.json` on the Vercel domain — infra work owned outside mobile | Product + Infra | |
+| 6 | **Supabase redirect-URL allowlist** entries for web dev, web prod, and mobile. A `redirectTo` not on the list is silently ignored | Backend | |
+| 7 | **Is PKCE flow enabled** on the Supabase project? 🔒 Required so recovery tokens don't ride in URL fragments | Backend | |
+| 8 | **Explicit or implicit reactivation** after deactivation? [Recommend explicit](./04-deactivate-account.md#r-reactivate-prompt) | Product | |
+| 9 | **Does this product have a social graph at all?** Feature 5 is a new product surface, not a port. Everything in that document is downstream of this | Product | |
+| 10 | **Privacy review:** exposing `fullName` and `italianLevel` to other users changes what sign-up consented to | Product + Legal | |
+| 11 | **Does "feed" mean the Playground dashboard?** It is the only candidate surface | Product + Design | |
+| 12 | **The gateway's absolute URL per environment** for mobile. Web relies on a Vite proxy (`vite.config.ts:18-20`); mobile has no proxy | Backend/Infra | |
 
-- **#19 / #20** — session model after a password change. Getting it wrong causes
-  spurious logouts or leaves attacker sessions alive.
-- **#21** — the `401` ambiguity. Without a distinguishing code, a wrong password logs
-  the user out.
-- **#24** — immediate vs. grace-period deletion. Changes the flow, the copy, and the
-  login path.
-- **#41 / #42** — reactivation model. Changes the login flow, which is owned by a
-  different part of the app.
-- **#43 / #44** — how deactivated users are represented and rendered. This is not a
-  settings-screen concern; it touches every surface that renders a person, and is the
-  largest hidden scope item in this guide.
-- **#9** — universal/app link configuration for the reset path. Owned outside mobile,
-  and blocks the forgot-password flow end to end.
+## 🟡 Needed soon — decide during the build
+
+| # | Question | Ask | Answer |
+|---|----------|-----|--------|
+| 13 | **Password policy.** There is none in the codebase; the effective rule is Supabase's 6-character default. Raise it, and add a shared `passwordSchema` to `@edge/shared` | Product + Backend | |
+| 14 | Enable Supabase leaked-password protection? | Backend | |
+| 15 | Supabase **auth rate limits** for the project (reset emails, sign-in attempts) — the gateway's 60/min does not cover Supabase-direct calls | Backend | |
+| 16 | Recovery-token **TTL** (Supabase default 1 hour) — [B] copy must state it accurately | Backend | |
+| 17 | **Are other sessions revoked** on password reset and on password change? Supabase's default may not; if not, add an `auth.admin.signOut` call | Backend | |
+| 18 | `signOut` scope supported by the installed SDK version — `"others"` vs `"global"` | Backend | |
+| 19 | **Confirmation emails** for password change, deletion, and deactivation. None exist today | Backend | |
+| 20 | Which **Supabase Storage bucket** holds `Session.audioUrl`? Deletion must remove those objects before the rows that name them | Backend | |
+| 21 | Add **`ON DELETE CASCADE`** to user-owned relations? Would make [deletion order](./03-delete-account.md#deletion-order) a non-issue permanently | Backend | |
+| 22 | Wrap deletion in a **transactional RPC**? The JS client has no transaction API, so partial failure is possible | Backend | |
+| 23 | Deactivation check in `authPlugin`: **per-request DB lookup or Redis cache?** Redis is already wired up for rate limiting | Backend | |
+| 24 | Expose deactivation state on `/api/profile`, or add `GET /api/account/status`? | Backend | |
+| 25 | **Queued BullMQ jobs** for a user who deactivates or deletes mid-flight — cancel, or let them complete? | Backend | |
+| 26 | Re-registering with the same email after deletion — allowed? | Product | |
+| 27 | **Reason lists** for delete and deactivate | Product | |
+| 28 | Final-confirmation word for deletion, and 🔒 **its localization** — the audience is non-Italian speakers learning Italian | Product | |
+| 29 | Is a **data export** wanted before deletion? `/api/reports` already aggregates most of it | Product | |
+| 30 | Is a **deactivation duration** offered ("1 week / 1 month")? Needs a scheduled job | Product | |
+| 31 | Behavior when a **deactivated user resets their password** — currently would succeed and hit the reactivation prompt on next sign-in | Product | |
+| 32 | **Deactivate → delete** path: reactivate first, or allow deletion straight from the prompt? | Product | |
+| 33 | Password **Unicode normalization** — keep client input unmodified and confirm Supabase's handling | Backend | |
+| 34 | Is **OAuth sign-in** planned? Decides whether "Set password" branches are real or dead code | Product | |
+
+## 🟢 Feature 5 only — after question 9 is answered
+
+| # | Question | Ask | Answer |
+|---|----------|-----|--------|
+| 35 | Scoring **signal weights** for suggestions (same level, adjacent level, shared topics, mutual friends, recency) | Product | |
+| 36 | Which **fields** may a suggestion payload expose? 🔒 Never `email` | Product + Legal | |
+| 37 | Do designs need **avatars**? No avatar column exists on `profiles` | Design | |
+| 38 | Section **placement and copy** on the dashboard — "People you may know" implies a social network this product may not be | Design | |
+| 39 | Minimum suggestion count below which the section is hidden (suggest 3) | Design | |
+| 40 | After adding — card stays as `Requested`, or animates out? | Design | |
+| 41 | **"Don't suggest me to others"** setting — 🔒 should exist from day one | Product | |
+| 42 | May **mutual friends' names or avatars** be shown, or only a count? | Product + Legal | |
+| 43 | Is a **notification system** in scope? Without one, an accepted friend request is only discoverable by chance | Product | |
+| 44 | Extract `cefrDistance()` (`routes/recommendations.ts:13`) to a shared util, or duplicate it? | Backend | |
+| 45 | Do analytics exist anywhere? **No library is present in this codebase** — the event names in this guide are proposals | Product | |
+
+---
+
+## What the codebase already answered
+
+Recorded so nobody re-asks. All ✅ VERIFIED, with references in
+[`README.md`](./README.md#part-1--conventions-as-they-exist-today).
+
+| Answered | Value |
+|----------|-------|
+| Error envelope | `{ "message": string }`, plus `errors` on Zod `400`s. **No error codes anywhere** |
+| Auth mechanism | Supabase Auth client-side; gateway verifies `Bearer` via `supabase.auth.getUser` |
+| Unauthenticated routes | `/livez`, `/readyz`, `/metrics`, `/api/auth/callback`, `/api/breaker-demo`, `/admin` |
+| Rate limiting | 60/min global, keyed `userId \|\| ip`, Redis-backed |
+| Case convention | camelCase both ways; `toCamelCase` on responses, manual mapping on requests |
+| Validation | Zod from `@edge/shared`; `400 { message: "Validation error", errors }` |
+| Status codes | `200` / `201` / `400` / `401` / `404` / `429` / `500` |
+| Data access | 🔒 RLS on, zero policies — **mobile must never query Supabase tables**, only `auth.*` |
+| Client cache | TanStack Query; key list and `staleTime` values documented in the README |
+| Route guard | Spinner → `/login` → `/onboarding` → render |
+| Form conventions | TanStack Form, blur validators, inline red errors, disabled submit + spinner, `sonner` toasts |
+| `profiles` columns | No `deleted_at`, no `deactivated_at`, no status column |
+| Cascade rules | **None** — no relation declares `onDelete`, so deletion order is mandatory |
+| Migration convention | `supabase/migrations/<timestamp>_<name>.sql`, Prisma schema synced by hand |
+| Ranked-list precedent | `/api/recommendations` — scoring, sorting, re-order-after-`IN`, fallback `try/catch` |
+| Feed | Does not exist. Closest surface is the Playground dashboard |
+| Social graph | Does not exist. No relation between two `Profile` rows anywhere |
+| Analytics | No library present |
+| Password validation | None beyond "not empty" on the login form |
