@@ -3,9 +3,22 @@
 Implementation guide for building five features on a mobile client against the
 **Edge Language Coach** stack (Supabase Auth + Fastify gateway).
 
+> ### ⚠️ Scope note — this guide targets Edge Language Coach, not Sociaity
+>
+> These documents were requested for **Sociaity** (its backend and its website app). That
+> codebase is not reachable from a session scoped to `ibrahemaskar11`, so the guide was
+> written against **this** repository instead. It is accurate for Edge Language Coach and
+> should not be handed to a Sociaity mobile engineer.
+>
+> To produce the Sociaity version, follow
+> [`SOCIAITY-PORT-BRIEF.md`](./SOCIAITY-PORT-BRIEF.md) — it records what is blocked, how
+> to unblock it, and the per-feature extraction checklist to run once the Sociaity
+> backend and web repositories are in scope.
+
 | # | Feature | Document | Exists today? |
 |---|---------|----------|---------------|
-| 0 | **Open questions — read first** | [`00-open-questions.md`](./00-open-questions.md) | — |
+| — | **Sociaity port brief — read first** | [`SOCIAITY-PORT-BRIEF.md`](./SOCIAITY-PORT-BRIEF.md) | — |
+| 0 | **Open questions** | [`00-open-questions.md`](./00-open-questions.md) | — |
 | 1 | Forgot Password | [`01-forgot-password.md`](./01-forgot-password.md) | ❌ Not built |
 | 2 | Change Password | [`02-change-password.md`](./02-change-password.md) | ❌ Not built |
 | 3 | Delete Account | [`03-delete-account.md`](./03-delete-account.md) | ❌ Not built |
