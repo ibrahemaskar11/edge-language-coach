@@ -1,258 +1,252 @@
 # 3. Delete Account
 
+**Status:** 🆕 Not built. Requires a gateway route and a decision on soft vs hard delete.
 **Auth state:** Logged in + re-authentication
-**Depends on:** Local wipe, push deregistration
-**Pairs with:** [Deactivate Account](./04-deactivate-account.md) — read both before
-building either
+**Pairs with:** [Deactivate Account](./04-deactivate-account.md) — read both together
 
 ---
 
 ## Purpose
 
-Permanently removes the user's account and personal data. Irreversible (or reversible
-only within a defined grace period).
+Permanently removes the user's account and their learning data.
 
-📱 **This is not optional on mobile.** Both app stores require it:
+📱 **This is a store requirement, not a product nice-to-have:**
 
-- **Apple** — App Store Review Guideline **5.1.1(v)**: an app that supports account
-  creation must let the user **initiate account deletion from within the app**. A link
-  to a website is not sufficient on its own; the in-app path must exist. Apps have been
-  rejected for burying this or offering only a "contact support" route.
-- **Google Play** — the **Data deletion** policy requires an in-app deletion path *and*
-  a publicly reachable web URL for requesting deletion, both declared in the Play
-  Console Data safety form.
+- **Apple** — App Store Review Guideline **5.1.1(v)**: an app supporting account
+  creation must let the user **initiate deletion from within the app**. A link to a
+  website is not sufficient on its own.
+- **Google Play** — the **Data deletion** policy requires an in-app path *and* a publicly
+  reachable web URL, both declared in the Data safety form.
 
-So even if web treats this as a low-priority settings item, mobile must ship it as a
-first-class, discoverable flow. Budget for it accordingly.
+The web app has no deletion path at all today, so mobile cannot copy one. Mobile will
+likely ship this **before** web does, driven by review deadlines. Plan for that: the
+gateway route below is shared, so build it once and let web adopt it later.
+
+---
+
+## What already exists
+
+✅ VERIFIED — nothing. Specifically:
+
+- No settings surface (see [feature 2](./02-change-password.md#what-already-exists)).
+- No `deleted_at` or status column on `profiles`
+  (`packages/db/prisma/schema.prisma`).
+- No cascade rules: **no relation in the Prisma schema declares `onDelete`**, so Postgres
+  uses the default (`NO ACTION`). Deleting a profile row while sessions reference it
+  will **fail with a foreign-key violation**. Deletion order is therefore mandatory, not
+  an optimization — see [Deletion order](#deletion-order).
+- `apps/gateway/src/plugins/supabase.ts` creates a **service-role** client, which is
+  exactly what `auth.admin.deleteUser` requires. That part is ready.
 
 ---
 
 ## Delete vs. deactivate
 
-Get this distinction right before writing any code — users conflate them, and shipping
-one when the product wanted the other destroys data.
+Settle this before writing code.
 
 | | Deactivate | Delete |
 |---|---|---|
-| Reversible | Yes, any time | No (or only within a grace period) |
-| Data retained | Yes, hidden | No — erased or anonymized |
-| Profile visible | No | No |
-| Content (posts, messages) | Hidden, restored on return | Removed or anonymized |
-| Recovery | Sign in again | Not possible after grace period |
-| Typical intent | "I need a break" | "Remove me from this product" |
+| Reversible | Yes | No (or only within a grace period) |
+| Data retained | Yes, hidden | No |
+| Sessions, flashcards, reports | Preserved | Removed |
+| Recovery | Sign in again | Not possible after the grace period |
 
-The delete screen must **offer deactivation as an alternative** before the user
-commits. This is both good product design and materially reduces support load.
-⚠️ CONFIRM web does the same and mirror its copy.
+The delete screen must **offer deactivation as an alternative** before the user commits.
 
 ---
 
-## Entry points
+## ⚠️ CONFIRM first: hard delete or soft delete?
 
-| Location | Control |
-|----------|---------|
-| Settings → Account | "Delete account" — last row in the section, styled destructive (red) |
+This changes the schema, the route, and the copy. It is the top blocking decision.
 
-Requirements:
+**Option A — hard delete.** Rows removed, `auth.users` entry deleted. Truthful "this
+cannot be undone" copy. No recovery. Simplest to reason about and to defend in a privacy
+review.
 
-- Must be reachable in **at most 3 taps** from the app's main screen. Store reviewers
-  check this. Settings → Account → Delete account is exactly 3.
-- Do **not** hide it behind a "Danger zone" accordion that starts collapsed.
-- Do **not** make it a web link. It must run in-app.
+**Option B — soft delete with a grace period.** Add `deleted_at` to `profiles`, hide the
+account everywhere, and purge with a scheduled job after N days. Requires:
+
+- A migration (below)
+- A guard change so a soft-deleted user cannot use the app
+- 🆕 A purge job. Note `apps/workers/` already runs BullMQ workers
+  (`apps/workers/src/workers/`) — a repeatable purge job fits that existing pattern
+  rather than needing new infrastructure.
+
+Recommendation: **Option A** unless product actively wants recovery. This app stores
+learning history, not irreplaceable user-generated content shared with others, and
+Option B's purge job is real ongoing work.
+
+Everything below covers both; branches are marked.
+
+---
+
+## Deletion order
+
+🔒 Because no `onDelete` cascade exists, the route must delete in dependency order. Derived
+from `packages/db/prisma/schema.prisma`:
+
+```
+1. messages        WHERE session_id IN (user's sessions)   -- Message.sessionId → Session
+2. feedback        WHERE session_id IN (user's sessions)   -- Feedback.sessionId → Session
+3. sessions        WHERE user_id = :userId                 -- Session.userId → Profile
+4. user_flashcards WHERE user_id = :userId                 -- UserFlashcard.userId → Profile
+5. user_topics     WHERE user_id = :userId                 -- UserTopic.userId → Profile
+6. profiles        WHERE id = :userId
+7. auth.users      via supabase.auth.admin.deleteUser(userId)
+```
+
+Not touched — these are shared catalogue data, not user data: `topics`, `flashcards`,
+`placement_questions`.
+
+🆕 **Also delete stored audio.** `Session.audioUrl` points at recorded speech — the most
+sensitive data this app holds. ⚠️ CONFIRM which Supabase Storage bucket it uses, then
+remove those objects **before** step 3, while the rows still name them. Deleting the rows
+first orphans the files permanently.
+
+> **Strongly recommended 🆕:** add `ON DELETE CASCADE` to the user-owned relations so
+> this ordering stops being a correctness risk that every future contributor must
+> remember. That is a migration plus `onDelete: Cascade` in the Prisma schema, and it
+> makes steps 1–5 a single `DELETE FROM profiles`.
+
+---
+
+## Migration (Option B only)
+
+Following the repo convention `supabase/migrations/<timestamp>_<name>.sql`:
+
+```sql
+-- supabase/migrations/<YYYYMMDDHHMMSS>_add_profile_lifecycle.sql
+ALTER TABLE profiles ADD COLUMN deleted_at timestamptz;
+CREATE INDEX profiles_deleted_at_idx ON profiles (deleted_at) WHERE deleted_at IS NOT NULL;
+```
+
+Then update `packages/db/prisma/schema.prisma` by hand to match — the two are kept in
+sync manually in this repo:
+
+```prisma
+deletedAt DateTime? @map("deleted_at")
+```
+
+---
+
+## Gateway route 🆕
+
+```ts
+// apps/gateway/src/routes/account.ts
+fastify.delete("/api/account", async (request, reply) => {
+  // 1. Re-authenticate — see feature 2 for why the session alone is not enough.
+  const check = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+  const { error: authError } = await check.auth.signInWithPassword({
+    email: request.userEmail,
+    password: body.password,
+  });
+  if (authError) {
+    return reply.status(401)
+      .send({ message: "Password is incorrect.", code: "INVALID_CREDENTIALS" });
+  }
+
+  // 2. Delete in dependency order (see above), or set deleted_at for Option B.
+  // 3. supabase.auth.admin.deleteUser(request.userId)
+  return reply.send({ ok: true });
+});
+```
+
+🔒 The route must be **idempotent** — a retry after a dropped connection must return
+`200`, not a confusing `404`. Mobile networks drop requests; this will happen.
+
+🔒 It must also be **atomic enough**. The Supabase JS client has no transaction API, so a
+failure at step 4 leaves the account half-deleted. ⚠️ CONFIRM the approach: a Postgres
+function invoked via `supabase.rpc()` that wraps steps 1–6 in one transaction is the
+clean fix, and is worth the extra work here.
 
 ---
 
 ## Flow
 
 ```
-Settings ──► [A] What happens screen
-                   │ Continue
-                   ▼
-             [B] Re-authenticate  (password or provider)
-                   │ verified
-                   ▼
-             [C] Reason (optional)
-                   │
-                   ▼
-             [D] Final confirmation  (typed / hold-to-confirm)
-                   │ confirmed
-                   ▼
-             [E] Processing ──► local wipe ──► logged-out stack
-                   │
-                   └─ (if grace period) [F] Recovery notice
+Settings ──► [A] What happens ──► [B] Re-auth ──► [C] Reason (optional)
+                                                        │
+                                                        ▼
+                                              [D] Final confirmation
+                                                        │
+                                                        ▼
+                                              [E] Processing → local wipe → logged out
 ```
 
-Four screens for a destructive irreversible action is correct, not excessive. Do not
-compress this into a single alert dialog.
+Four screens for an irreversible action is correct. Do not compress it into one alert.
 
-### [A] "What happens" screen
+### [A] "What happens"
 
-The most important screen in the flow. It must be **specific**, not a generic warning.
-
-Structure:
+Be specific. Name the actual data this app holds — generic warnings read as boilerplate
+and users click through them.
 
 > **Delete your account**
 >
-> **This will permanently remove:**
-> - Your profile, photo, and account details
-> - Your posts, comments, and reactions
-> - Your friends and friend requests
-> - Your messages *(⚠️ CONFIRM: in group conversations, are your messages deleted, or
->   retained and shown as "Deleted user"? These are very different promises — state
->   whichever is true)*
-> - Your saved and liked content
+> This will permanently remove:
+> - Your profile and level
+> - All your speaking sessions and their recordings
+> - All transcripts, coaching feedback, and conversation history
+> - Your flashcard progress and review history
+> - Your weekly reports
 >
-> **This will not be removed:**
-> - *(⚠️ CONFIRM with backend/legal: records retained for legal, fraud-prevention,
->   or accounting obligations, and for how long)*
->
-> **This cannot be undone.** *(or: "You can restore your account within 30 days by
-> signing in.")*
+> **This cannot be undone.**
+> *(Option B: "You can restore your account by signing in within 30 days.")*
 
 Also on this screen:
 
-- **"Just need a break? Deactivate instead"** → routes to
-  [Deactivate](./04-deactivate-account.md).
-- ⚠️ CONFIRM whether active subscriptions block deletion or must be cancelled first.
-  📱 MOBILE-ONLY and important: an in-app-purchase subscription bought through Apple or
-  Google is **not** cancelled by deleting the account. If the user has one, say so
-  explicitly and deep link to the store's subscription management
-  (`https://apps.apple.com/account/subscriptions`,
-  `https://play.google.com/store/account/subscriptions`). Users who delete an account
-  and keep getting charged file chargebacks and one-star reviews.
-- 📱 MOBILE-ONLY: if the user has data worth keeping and an export feature exists, offer
-  "Download your data" here. ⚠️ CONFIRM whether one exists.
-
-**Controls:** `Continue` (destructive styling) and `Cancel` (prominent).
+- **"Just need a break? Deactivate instead"** → [feature 4](./04-deactivate-account.md).
+- ⚠️ CONFIRM whether a data export exists or is wanted. There is none today; for a
+  language-learning history this is a reasonable thing to offer, and cheap to add given
+  `/api/reports` already aggregates it.
+- ⚠️ CONFIRM subscriptions. This app has no billing today. 📱 If in-app purchases are
+  ever added, deleting the account does **not** cancel an Apple/Google subscription —
+  the screen must say so and deep link to store subscription management.
 
 ### [B] Re-authenticate
 
-🔒 SECURITY: mandatory. An unattended unlocked phone must not be able to delete an
-account. This is the single most important control in the flow.
+🔒 Mandatory. Same mechanism as [feature 2](./02-change-password.md), and the same
+reason: an unattended unlocked phone must not be able to delete the account.
 
-| Account type | Challenge |
-|--------------|-----------|
-| Password | Enter current password |
-| OAuth (Google/Apple) | Re-run the provider sign-in and send the fresh token ⚠️ CONFIRM backend accepts this |
-| Either | 📱 Biometric **only** as an additive convenience on top of a server-verified challenge, never as a replacement |
-
-Errors mirror [Change Password](./02-change-password.md#errors): wrong password is
-inline and rate limited.
-
-⚠️ CONFIRM the mechanism: does the backend expect the password in the delete request
-body, or a short-lived re-auth token obtained from a separate step-up endpoint? The
-latter is better; use whatever web uses.
+Errors are inline on the password field. 🔒 A failed attempt here must be rate limited —
+this endpoint is a password oracle otherwise.
 
 ### [C] Reason (optional)
 
-Single-select list plus optional free text. Must be genuinely skippable — a "Skip"
-control of equal visual weight to "Continue".
-
-⚠️ CONFIRM the reason codes web uses so analytics are comparable across platforms.
-
-🔒 Never block deletion on providing a reason.
+Single-select plus optional free text, genuinely skippable ("Skip" of equal weight).
+🔒 Never block deletion on a reason. ⚠️ CONFIRM the reason list with product; there is no
+existing set to mirror.
 
 ### [D] Final confirmation
 
-Requires a deliberate, non-accidental action. Pick **one** and match web:
+Requires a deliberate, non-accidental action:
 
-- **Typed confirmation** — user types `DELETE` (or their username). Most explicit; also
-  the most accessible. ⚠️ CONFIRM the exact expected string and whether matching is
-  case-sensitive. If localized, the expected word must be localized too — do not force
-  a user reading Arabic to type an English word.
-- **Hold to confirm** — press and hold ~3s with a progress ring. Slick, but harder for
-  users with motor impairments; if used, provide a typed fallback.
+- **Typed confirmation** — the user types `DELETE`. ⚠️ CONFIRM the word, and 🔒 **localize
+  it** — the app teaches Italian to non-Italian speakers, so a forced English word is a
+  real accessibility problem for part of the audience.
+- Or **hold-to-confirm** (~3s). Slicker, but harder with motor impairments; provide a
+  typed fallback if used.
 
-Never use a plain two-button alert here.
-
-Copy: restate irreversibility one final time, in one short sentence.
+Never a plain two-button alert.
 
 ### [E] Processing
 
-- Full-screen, non-dismissable, with a spinner.
-- Disable the hardware/gesture back navigation.
-- On success → [local wipe](./README.md#local-wipe) → reset navigation to the
-  logged-out stack → show a confirmation toast or screen.
+- Full-screen, non-dismissable, back navigation disabled.
+- On success → [local wipe](./README.md#local-wipe) → reset navigation to the logged-out
+  stack.
+- On failure → error + Retry. 🔒 **Do not wipe** — the account still exists.
 
-**Push deregistration ordering matters:** deregister the push token server-side
-*before* the delete request completes, or ensure the backend clears device tokens as
-part of deletion. A deleted account whose device still receives notifications is a
-privacy incident.
-
-**On failure:** show the error with Retry and Cancel. Do **not** wipe local state — the
-account still exists.
-
-### [F] Grace period notice (if applicable)
-
-⚠️ CONFIRM whether deletion is immediate or soft with a recovery window (30 days is a
-common choice).
-
-If a grace period exists:
-
-- State the exact deadline on the confirmation screen: "Your account will be
-  permanently deleted on 24 September 2026. Sign in before then to restore it."
-- ⚠️ CONFIRM what signing in during the window does — auto-restore, or restore behind a
-  confirmation prompt. Implement the latter if the choice is open; an accidental sign-in
-  should not silently undo an intentional deletion.
-- The user must still be fully signed out and locally wiped now.
-
----
-
-## API contract
-
-⚠️ CONFIRM route, method, and fields.
-
-### Optional step-up
-
-```http
-POST /auth/reauthenticate
-Authorization: Bearer <accessToken>
-{ "password": "<current>" }
-```
-→ `200 { "reauthToken": "<short-lived>" }`
-
-### Delete
-
-```http
-DELETE /account
-Authorization: Bearer <accessToken>
-Content-Type: application/json
-
-{
-  "reauthToken": "<from step-up>",   // or "password": "<current>"
-  "reason": "NOT_USEFUL",            // optional
-  "feedback": "free text"            // optional
-}
-```
-
-**`200`:**
-
-```jsonc
-{
-  "ok": true,
-  "deletionType": "immediate",        // or "scheduled"
-  "permanentDeletionAt": "2026-09-24T00:00:00Z"  // present when scheduled
-}
-```
-
-| Status | `code` | Client action |
-|--------|--------|---------------|
-| `401` / `403` | `REAUTH_REQUIRED` / `INVALID_CREDENTIALS` | Back to [B] with inline error |
-| `409` | `SUBSCRIPTION_ACTIVE` | Explain and deep link to store subscription management |
-| `429` | `RATE_LIMITED` | Countdown |
-| `5xx` | — | Retry; **do not** wipe locally |
+📱 Deregister the push token before or as part of deletion. A deleted account whose
+device still receives notifications is a privacy incident. (No push exists in this
+codebase yet; wire it in when push is added.)
 
 ---
 
 ## Client state
 
-- On success: full [local wipe](./README.md#local-wipe) — every item on that list.
-- Reset the navigation stack; the authenticated screens must be unreachable via back.
-- Reset the analytics identity (`reset()`), then optionally emit the deletion event
-  anonymously.
-- 📱 Clear the OS password-manager association if you created one? No — leave saved
-  credentials alone. That entry belongs to the user, not the app.
-- Clear any biometric-unlock enrollment tied to the account.
+- Success → full [local wipe](./README.md#local-wipe), every item on that list. Cached
+  transcripts and audio on disk are the sensitive part.
+- Reset the navigation stack so authenticated screens are unreachable via back.
+- Reset the analytics identity after emitting the final event.
 
 ---
 
@@ -260,52 +254,52 @@ Content-Type: application/json
 
 | Case | Expected behavior |
 |------|-------------------|
-| Active IAP subscription | Warn, deep link to store management. ⚠️ CONFIRM whether the backend blocks or allows |
-| Network drops during [E] | Show retry. Do not wipe. On retry, deletion must be **idempotent** — a second call for an already-deleted account should return success, not a confusing `404`. ⚠️ CONFIRM |
-| User is the sole admin/owner of a group | ⚠️ CONFIRM: block with an explanation and a transfer-ownership path, or auto-transfer, or dissolve the group. Must not orphan the group |
-| User has pending friend requests | Removed silently on both sides |
-| Deletion while another device is signed in | That device's next request 401s → forced logout |
-| User signs in during the grace period | See [F] |
-| User re-registers with the same email after deletion | ⚠️ CONFIRM: fresh account with no prior data, or blocked until permanent deletion completes |
-| App killed during [E] | On next launch the token is invalid → forced logout → clean state |
-| Deletion request succeeds but the response is lost | Next launch 401s → logout. Acceptable |
-| Account already deactivated | ⚠️ CONFIRM: deletion should still be reachable, likely requiring reactivation first or accepting the deactivated session |
+| FK violation mid-delete | 🔒 Must not happen — enforced by [deletion order](#deletion-order) or cascades. Test with a user who has sessions, messages, feedback, flashcards, and topics |
+| Network drops during [E] | Retry. The route must be idempotent |
+| Retry after partial deletion | Succeeds and completes the remainder |
+| Audio files in Storage | Removed. Verify the bucket is empty for that user afterwards |
+| Another device signed in | Its next request hits `authPlugin:39`, `getUser` fails → `401 { "message": "Invalid token" }` → forced sign-out. ✅ Works today with no extra work |
+| Re-registering with the same email | ⚠️ CONFIRM. Hard delete frees the `profiles.email` unique constraint, so a fresh account is possible. Under Option B the row still exists and `signUp` will fail on the unique index — that must be handled |
+| Deleting while a coaching session is `coaching` | Session rows are deleted; any queued BullMQ job for that session will fail. ⚠️ CONFIRM whether queued summary/flashcard jobs should be cancelled first (`apps/workers/src/workers/`) |
+| App killed during [E] | Next launch: token invalid → forced sign-out → clean state |
+| Account already deactivated | ⚠️ CONFIRM: deletion should remain reachable |
 
 ---
 
 ## Security requirements
 
-🔒 All mandatory:
+🔒 Mandatory:
 
-1. **Re-authentication required**, verified server-side. Never a local-only check.
-2. **Rate limited** on the re-auth challenge.
-3. **Confirmation email** on deletion (or scheduled deletion), including the recovery
-   deadline if any. This is the user's only alert if the deletion was unauthorized.
-   ⚠️ CONFIRM backend sends it.
-4. **All sessions revoked** immediately — every device, not just this one.
-5. **Push tokens deregistered** for the account across all devices.
-6. **Complete local wipe** — a partial wipe leaking cached friends or messages after
-   deletion is a privacy bug.
-7. **Idempotent** server-side, so retries are safe.
-8. ⚠️ CONFIRM with whoever owns privacy compliance what "deleted" means in the
-   backend — hard delete, anonymization, or tombstone — and make the copy in [A]
-   truthful. Do not promise erasure the backend does not perform.
+1. **Re-authentication verified server-side**, never a local-only check.
+2. **Rate limited** on the password check.
+3. **Idempotent** so retries are safe.
+4. **Transactional**, or with a documented, tested recovery path for partial failure.
+5. **Audio and transcripts removed**, including Storage objects — this is the most
+   sensitive data in the product.
+6. **All sessions invalidated** — ✅ automatic once `auth.users` is deleted.
+7. **Complete local wipe** on the device.
+8. **Confirmation email** on deletion. ⚠️ CONFIRM — the account owner's only signal if the
+   deletion was unauthorized. Under Option B it must carry the recovery deadline.
+9. **Truthful copy** — [A] must describe what the backend actually does. Do not promise
+   erasure if Option B retains rows for 30 days.
 
 ---
 
-## Analytics
+## Work breakdown
 
-| Event | Properties |
-|-------|-----------|
-| `delete_account_opened` | `source: settings` |
-| `delete_account_alternative_shown` | — |
-| `delete_account_deactivate_chosen` | — (measures how many the alternative diverts) |
-| `delete_account_reauth_failed` | — |
-| `delete_account_reason_selected` | `reason` |
-| `delete_account_confirmed` | `deletion_type: immediate \| scheduled` |
-| `delete_account_abandoned` | `step: A \| B \| C \| D` |
-
-🔒 Emit the final event **before** resetting the analytics identity, then reset.
+| Task | Owner | Blocking? |
+|------|-------|-----------|
+| Decide hard vs soft delete | Product | 🔴 Yes |
+| Settings screen / IA | Design + Mobile | 🔴 Yes |
+| `DELETE /api/account` route + deletion order | Gateway | 🔴 Yes |
+| Re-auth mechanism (shared with feature 2) | Gateway | 🔴 Yes |
+| Confirm the Storage bucket for `audioUrl` | Backend | 🔴 Yes |
+| `ON DELETE CASCADE` migration (recommended) | Backend | 🟡 Soon |
+| Transactional RPC wrapper | Backend | 🟡 Soon |
+| `deleted_at` migration + purge worker (Option B only) | Backend | 🟡 Soon |
+| Reason list, confirmation word + localization | Product | 🟡 Soon |
+| Confirmation email | Backend | 🟡 Soon |
+| Screens [A]–[E] | Mobile | |
 
 ---
 
@@ -313,21 +307,19 @@ Content-Type: application/json
 
 - [ ] Reachable within 3 taps from the main screen (store requirement)
 - [ ] In-app, not a web link (store requirement)
-- [ ] "What happens" screen lists specific data, not a generic warning
+- [ ] [A] lists this app's actual data, not a generic warning
 - [ ] Deactivate is offered as an alternative
-- [ ] Re-authentication is enforced and verified server-side
-- [ ] Wrong password at [B] shows an inline error and does not delete
+- [ ] 🔒 Re-authentication enforced and verified server-side
+- [ ] Wrong password at [B] shows an inline error and deletes nothing
 - [ ] Reason step is genuinely skippable
-- [ ] Final confirmation requires a deliberate action, not one tap
-- [ ] Typed-confirmation word is localized in every supported language
-- [ ] Back navigation is disabled during processing
+- [ ] Confirmation word is localized
+- [ ] Back navigation disabled during [E]
+- [ ] 🔒 Deleting a user with sessions + messages + feedback + flashcards + topics succeeds (FK order)
+- [ ] Audio objects removed from Storage
+- [ ] Retry after a dropped connection succeeds (idempotency)
 - [ ] Failure does **not** wipe local state
-- [ ] Success performs a **complete** local wipe (verify caches on disk)
-- [ ] Push notifications stop arriving on the device
+- [ ] Success performs a complete local wipe — verify caches on disk
 - [ ] Other devices are signed out
 - [ ] Confirmation email arrives
-- [ ] Retrying after a dropped connection does not error
-- [ ] IAP subscription warning appears when one is active
-- [ ] Grace-period deadline shown accurately, if applicable
-- [ ] Sole-group-owner case behaves per the confirmed policy
+- [ ] Re-registering with the same email behaves per the confirmed policy
 - [ ] Screen reader reads the destructive warning before the confirm control

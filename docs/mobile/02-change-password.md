@@ -1,19 +1,109 @@
 # 2. Change Password
 
+**Status:** 🆕 Not built.
+**Where it lives:** Supabase Auth client-side, **plus** a new gateway route for
+re-authentication (see below).
 **Auth state:** Logged in
-**Depends on:** Nothing beyond the authenticated HTTP client
 
 ---
 
 ## Purpose
 
-Lets a signed-in user replace their password, proving they are the account holder by
-supplying the current one. Distinct from [Forgot Password](./01-forgot-password.md),
-which is for users who cannot sign in.
+Lets a signed-in user replace their password. Distinct from
+[Forgot Password](./01-forgot-password.md), which is for users who cannot sign in.
 
-The critical design decision is **session handling after success** — see
-[After success](#after-success). Getting it wrong either logs the user out of the
-device they just used (annoying) or leaves an attacker's session alive (a security bug).
+---
+
+## What already exists
+
+✅ VERIFIED:
+
+- No settings or account screen exists in the web app at all. Routes under
+  `apps/web/src/routes/` are: login, register, onboarding, and `playground/*`
+  (topics, chats, flashcards, reports, session). There is no `/settings`.
+- The sidebar (`apps/web/src/components/app-sidebar.tsx`) has no account section.
+- `apps/web/src/lib/auth.ts` has no password-change function.
+
+So features 2, 3, and 4 all need a **settings surface that does not exist yet**. Build
+it once; all three live in it.
+
+⚠️ CONFIRM the settings information architecture with design before building three
+screens that have nowhere to go. Minimum viable: `Settings → Account` containing
+*Change password*, *Deactivate account*, *Delete account*.
+
+---
+
+## 🔒 The critical gap: Supabase does not verify the current password
+
+`supabase.auth.updateUser({ password })` changes the password **using only the existing
+session**. It does not ask for, or check, the current password.
+
+That means a naive implementation lets anyone holding an unlocked phone change the
+account password and lock the owner out. 🔒 This is not acceptable for a change-password
+flow, and it is the main reason this feature needs backend work at all.
+
+Two ways to close it:
+
+**Option A — client-side re-auth (no backend work).**
+Before updating, call `signInWithPassword({ email, password: currentPassword })` and
+require it to succeed.
+
+- ✅ No gateway changes.
+- ❌ The check is client-side; a modified client can skip it.
+- ❌ Consumes Supabase auth rate limit and issues a fresh session as a side effect.
+
+**Option B — gateway-verified re-auth (recommended). 🆕 TO BUILD.**
+Add a route that verifies the password server-side using the service-role client that
+already exists (`apps/gateway/src/plugins/supabase.ts`), then performs the update via
+`auth.admin.updateUserById`.
+
+```ts
+// apps/gateway/src/routes/account.ts  🆕
+fastify.post("/api/account/change-password", async (request, reply) => {
+  let body;
+  try {
+    body = changePasswordSchema.parse(request.body);   // 🆕 in @edge/shared
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return reply.status(400)
+        .send({ message: "Validation error", errors: err.flatten().fieldErrors });
+    }
+    throw err;
+  }
+
+  // Verify the current password against the authenticated user's email.
+  const check = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+  const { error: authError } = await check.auth.signInWithPassword({
+    email: request.userEmail,                 // set by authPlugin:46
+    password: body.currentPassword,
+  });
+  if (authError) {
+    return reply.status(401).send({
+      message: "Current password is incorrect.",
+      code: "INVALID_CREDENTIALS",            // 🆕 see the error-model note below
+    });
+  }
+
+  const { error } = await fastify.supabase.auth.admin.updateUserById(
+    request.userId, { password: body.newPassword }
+  );
+  if (error) return reply.status(400).send({ message: error.message });
+
+  return reply.send({ ok: true });
+});
+```
+
+Register it in `apps/gateway/src/server.ts` alongside the other route plugins. It is
+**not** added to the `authPlugin` allowlist — it requires a valid session, by design.
+
+> **🆕 The error-model addition matters most here.** `authPlugin` already returns `401`
+> for an expired token (`plugins/auth.ts:42`). If wrong-current-password also returns a
+> bare `401 { message }`, the mobile HTTP client cannot tell them apart and will log the
+> user out on a typo. Either return the `code` field as above, or use **`403`** for
+> wrong-password so the status alone disambiguates. Pick one and write it down.
+> ⚠️ CONFIRM which.
+
+Everything below assumes **Option B**.
 
 ---
 
@@ -22,21 +112,19 @@ device they just used (annoying) or leaves an attacker's session alive (a securi
 | Location | Control |
 |----------|---------|
 | Settings → Account | "Change password" row |
-| Security/Privacy section, if one exists | Same row |
 
-**Visibility rule:** hide or transform this row for accounts with no password.
+**Visibility rule** — hide or transform the row for accounts with no password.
 
-⚠️ CONFIRM how the backend reports whether the account has a password —
-likely a field on the profile/me response such as `hasPassword` or a list of linked
-identity providers. Behavior:
+Supabase exposes this on the user object: `user.identities` (an array of linked
+providers) and `user.app_metadata.provider` / `providers`. An account created with
+`signUp({ email, password })` — the only path this app currently has
+(`apps/web/src/lib/auth.ts:47`) — has an `email` identity, so every existing user has a
+password today.
 
-| Account type | Row behavior |
-|--------------|--------------|
-| Email + password | "Change password" → full flow below |
-| OAuth-only (Google / Apple) | "Set password" → same screen **without** the current-password field; ⚠️ CONFIRM the backend supports setting an initial password, and whether it requires re-auth via the provider first |
-| OAuth + password already linked | "Change password" → full flow |
-
-Do not show "Change password" to an OAuth-only user and let them fail at submit.
+⚠️ CONFIRM whether OAuth sign-in is planned. If it is, this row must become "Set
+password" for provider-only accounts, calling `updateUser({ password })` **without** a
+current-password step (the provider session is the proof). If OAuth is not planned,
+skip that branch entirely rather than building dead code.
 
 ---
 
@@ -44,152 +132,118 @@ Do not show "Change password" to an OAuth-only user and let them fail at submit.
 
 ```
 Settings ──► [A] Change password form
-                     │ submit
+                     │ POST /api/account/change-password
                      ▼
              ┌───────┴────────┐
-        success              failure
+        200                  4xx
              │                │
              ▼                ▼
         [B] Success      inline error on the offending field
-             │
-             ▼
-      Settings (toast) + other sessions revoked
 ```
 
-### [A] Change password form
+### [A] Form
 
-**Fields, in this order:**
+**Fields, in order:** current password · new password · confirm new password.
 
-1. **Current password** — `textContentType="password"` / `autoComplete="current-password"`
-2. **New password** — `textContentType="newPassword"` / `autoComplete="new-password"`
-3. **Confirm new password** — same content type
-
-Details:
-
+- 📱 `textContentType`: `password`, `newPassword`, `newPassword`.
 - Independent visibility toggle per field.
-- Live policy checklist under the new-password field. See
-  [Password policy](./README.md#password-policy) — mirror web's rules exactly.
-- Submit enabled only when all three are non-empty and 2 matches 3.
-- A "Forgot your current password?" link routing into
-  [Forgot Password](./01-forgot-password.md) — this is a real dead end otherwise, and a
-  user who cannot recall their current password has no other path.
-- 📱 MOBILE-ONLY: offer biometric re-auth (Face ID / Touch ID / BiometricPrompt) as a
-  substitute for typing the current password **only if** web has an equivalent
-  step-up mechanism and the backend accepts the resulting attestation. ⚠️ CONFIRM.
-  If the backend has no such notion, do not invent one — a local-only biometric check
-  that still sends a stored password is security theater.
+- Live policy checklist under *new password* — see
+  [Password policy](./README.md#password-policy).
+- Submit enabled only when all three are non-empty and fields 2 and 3 match.
+- **"Forgot your current password?"** → routes into
+  [Forgot Password](./01-forgot-password.md). Without it this screen is a dead end for
+  exactly the users who need it.
+- Follow the web form conventions from `login-form.tsx`: validators on blur, red inline
+  error text under the field, disabled submit with an inline spinner while pending, and
+  a `sonner`-style toast on success.
 
-**States:** `idle` → `submitting` → `success` | `error`
+**States:** `idle` → `submitting` → `success` | `error`.
 
 ### Errors
 
-| Condition | `code` (⚠️ CONFIRM) | Display |
-|-----------|--------------------|---------|
-| Current password wrong | `INVALID_CREDENTIALS` | Inline on **current password**: "Current password is incorrect." |
-| New password fails policy | `PASSWORD_POLICY` | Inline on **new password**, naming the unmet rule |
-| New == current | `PASSWORD_REUSED` | Inline on **new password**: "New password must be different from your current password." |
-| Matches a recent password | `PASSWORD_RECENTLY_USED` | Inline: "You've used this password recently. Choose a different one." |
-| Confirm mismatch | *client-side* | Inline on **confirm** |
-| Too many attempts | `RATE_LIMITED` | Countdown, submit disabled |
-| Session expired mid-flow | `401` | Refresh once; if that fails, log out and preserve nothing |
-| Network | — | Banner + Retry |
+| Condition | Response | Display |
+|-----------|----------|---------|
+| Confirm mismatch | *client-side* | Inline on confirm |
+| New fails policy | `400` + `errors` map | Inline on new password |
+| Current password wrong | `401` + `code: INVALID_CREDENTIALS` (or `403`) | Inline on **current password** — 🔒 must **not** log the user out |
+| Access token expired | `401 { message: "Invalid token" }` from `authPlugin:42` | Refresh via the SDK, retry once, then sign out |
+| New == current | Supabase rejects; `400` | Inline on new password |
+| Rate limited | `429` + `Retry-After` | Cooldown countdown |
+| Network | — | Snackbar + Retry |
 
-🔒 SECURITY: an incorrect current password is a **failed authentication attempt**. It
-must be rate limited server-side and must not be distinguishable in timing from a
-correct one that failed policy.
+⚠️ The `401` collision is the thing to get right. See the error-model note above.
 
 ### [B] After success
 
-⚠️ CONFIRM which model web uses — this is the item most likely to diverge:
+⚠️ CONFIRM whether other sessions should be revoked. Supabase's
+`admin.updateUserById` does **not** revoke other refresh tokens by default.
 
-**Model 1 — keep current session, revoke all others (recommended).**
-The backend issues a fresh token pair for the calling device and invalidates every
-other refresh token. The user stays signed in here; other devices are signed out.
+🔒 Recommended: revoke them. In the same route, after a successful update:
 
-Client work:
+```ts
+await fastify.supabase.auth.admin.signOut(request.userId, "others");
+```
 
-- Store the new token pair returned in the response. **If the backend rotates tokens,
-  you must persist them.** Missing this is the classic bug: the change succeeds, then
-  the next request 401s because the old token was revoked.
-- ⚠️ CONFIRM whether the response body carries new tokens or whether the existing
-  token stays valid.
-- Show a success toast on Settings: "Password changed. You've been signed out on other
-  devices."
+⚠️ CONFIRM the scope argument supported by the installed `@supabase/supabase-js` version
+(`others` vs `global`) — `global` would sign out the calling device too, which changes
+the client behavior below.
 
-**Model 2 — revoke everything including this session.**
-User is returned to login and must sign in with the new password.
+**Client behavior under "revoke others":**
 
-- Perform a full [local wipe](./README.md#local-wipe).
-- Route to login with email prefilled and a toast: "Password changed. Please sign in
-  again."
+- The calling device keeps its session — no token juggling needed, because the change
+  went through the gateway rather than mutating the local session.
+- Toast: "Password changed. You've been signed out on other devices."
+- Navigate back to Settings.
 
-Whichever model web uses, mobile uses the same one. Do not mix.
+**Client behavior if "global" is used instead:** perform a full
+[local wipe](./README.md#local-wipe) and route to login with the email prefilled.
+
+Pick one. Do not let web and mobile diverge here.
 
 ---
 
-## API contract
-
-⚠️ CONFIRM route and fields.
+## API contract 🆕
 
 ```http
-POST /account/change-password
-Authorization: Bearer <accessToken>
+POST /api/account/change-password
+Authorization: Bearer <supabase access_token>
 Content-Type: application/json
 
-{
-  "currentPassword": "<current>",
-  "newPassword": "<new>"
-}
+{ "currentPassword": "...", "newPassword": "..." }
 ```
 
-**`200`:**
+Request body is camelCase, matching the repo convention (`routes/profile.ts`).
+Schema belongs in `packages/shared/src/schemas.ts`:
 
-```jsonc
-{
-  "ok": true,
-  // Present under Model 1 if the backend rotates tokens — persist these.
-  "accessToken": "...",
-  "refreshToken": "..."
-}
+```ts
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: passwordSchema,     // 🆕 shared policy — see README
+});
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 ```
 
-| Status | `code` | Client action |
-|--------|--------|---------------|
-| `400` | `PASSWORD_POLICY` | Inline on new password |
-| `400` | `PASSWORD_REUSED` | Inline on new password |
-| `401` | `INVALID_CREDENTIALS` | Inline on current password — **do not** treat as an expired session |
-| `401` | *token expired* | Refresh, retry once, else log out |
-| `429` | `RATE_LIMITED` | Countdown |
-
-⚠️ **Ambiguity to resolve with backend:** `401` is used both for "wrong current
-password" and "your access token expired". The client cannot distinguish them without
-the `code`. If the backend does not return a distinguishing code, ask for one — or ask
-for wrong-password to return `403`. Guessing here produces spurious logouts.
-
-### Setting an initial password (OAuth-only accounts)
-
-⚠️ CONFIRM whether this endpoint exists and its shape:
-
-```http
-POST /account/set-password
-{ "newPassword": "<new>" }
-```
+| Status | Body | Client action |
+|--------|------|---------------|
+| `200` | `{ "ok": true }` | Toast + back to Settings |
+| `400` | `{ "message": "Validation error", "errors": {...} }` | Inline field errors from `errors` |
+| `401` | `{ "message": "...", "code": "INVALID_CREDENTIALS" }` | Inline on current password |
+| `401` | `{ "message": "Invalid token" }` | Refresh, retry once, else sign out |
+| `429` | rate-limit body + `Retry-After` | Cooldown |
+| `500` | `{ "message": "<raw supabase error>" }` | Generic message; 🔒 do not render verbatim |
 
 ---
 
 ## Client state
 
-- Passwords live in component state only. Never in a global store, never persisted,
-  never in a form-autosave/draft mechanism.
-- Clear all three fields on unmount, on success, and on backgrounding.
-  📱 MOBILE-ONLY: also clear on app background — a password left in a field is visible
-  in the OS app switcher snapshot.
-- 📱 MOBILE-ONLY: enable the OS secure-screen flag while this screen is mounted
-  (`FLAG_SECURE` on Android; on iOS blur or overlay the window on `willResignActive`)
-  so the app-switcher screenshot does not capture typed credentials.
-- On success under Model 1: persist rotated tokens **before** navigating away.
-- On success under either model: invalidate any cached "security" or "sessions" screen
-  data so device lists reflect the revocations.
+- Passwords live in local component state only. Never in the auth store, never
+  persisted, never in a draft/autosave mechanism.
+- Clear all three fields on unmount, on success, **and on app background**.
+- 📱 Set the OS secure-screen flag while this screen is mounted — `FLAG_SECURE` on
+  Android; blur or overlay the window on `willResignActive` on iOS — so the app-switcher
+  snapshot cannot capture typed credentials.
+- No query-cache invalidation is needed: no cached data changes. (If a "devices" or
+  "security" screen is ever added, invalidate it here.)
 
 ---
 
@@ -197,64 +251,67 @@ POST /account/set-password
 
 | Case | Expected behavior |
 |------|-------------------|
-| User has no password (OAuth-only) | Row reads "Set password"; current-password field hidden |
-| New password identical to current | Server rejects with `PASSWORD_REUSED`; also check client-side to save a round trip |
-| Password manager autofills current into all three fields | Detect and clear; validate that new ≠ current before enabling submit |
-| App backgrounded mid-form | Fields cleared on resume, with a brief explanatory note rather than silent loss |
-| Token expires between form load and submit | Silent refresh, retry once, transparent to the user |
-| Change succeeds but token persistence fails | Next request 401s → refresh fails → forced logout. Acceptable, but persist tokens *before* navigating to make it rare |
-| Two devices change the password concurrently | Second request fails with `INVALID_CREDENTIALS` (its "current" is stale). Show the normal inline error |
-| User is deactivated | ⚠️ CONFIRM — likely blocked; a deactivated user should reactivate first |
-| Very long password (64+ chars) from a generator | Must be accepted, never truncated |
-| Unicode / emoji in password | Must be accepted. Normalize consistently (NFC) on both platforms and match web ⚠️ CONFIRM |
+| Password manager autofills all three fields identically | Detect new == current client-side and keep submit disabled |
+| App backgrounded mid-form | Fields cleared on resume, with a short note rather than silent loss |
+| Token expires between screen load and submit | SDK refresh, retry once, transparent |
+| Two devices change the password concurrently | The second fails with `INVALID_CREDENTIALS` (its "current" is stale) — normal inline error |
+| 64+ character generated password | Must be accepted unmodified. 🔒 Never truncate |
+| Unicode / emoji password | Accepted. ⚠️ CONFIRM Supabase's normalization and keep client input unmodified |
+| User is deactivated (feature 4) | 🆕 The route should reject — add the deactivation check to the shared guard, see [feature 4](./04-deactivate-account.md) |
+| Rate limit hit via the gateway's 60/min | Cooldown; note this budget is shared app-wide (`server.ts:68`) |
 
 ---
 
 ## Security requirements
 
-🔒 All mandatory:
+🔒 Mandatory:
 
-1. **Current password always required** for a change (not for an initial set on an
-   OAuth-only account, where the provider session is the proof).
-2. **All other sessions revoked** on success.
-3. **Confirmation email** sent by the backend ("your password was changed"). ⚠️ CONFIRM.
-4. **Rate limited** on the current-password check, server-side.
-5. **Never log** any of the three field values — including in redux devtools, network
-   inspectors shipped in release builds, or crash-report breadcrumbs.
-6. **Secure-screen flag** set while the form is mounted (📱 MOBILE-ONLY).
-7. **No client-side password storage** — the app must never be able to answer "what is
-   my current password", which means no "remember password" feature.
-8. **TLS pinning** if the rest of the app uses it; do not exempt this route.
+1. **Current password verified server-side.** Option A (client-only) is a stopgap, not
+   an implementation.
+2. **Other sessions revoked** on success.
+3. **Wrong-password distinguishable from expired-token** by the client, via `code` or a
+   distinct status. Otherwise typos cause logouts.
+4. **Rate limited.** ✅ The gateway's global 60/min applies (`server.ts:66-79`); ⚠️ CONFIRM
+   whether a tighter per-route limit is warranted for a credential check — it is.
+5. **Never log** any of the three values — not in network inspectors shipped in release
+   builds, not in crash breadcrumbs.
+6. 📱 **Secure-screen flag** while the form is mounted.
+7. **No stored password** anywhere in the app. No "remember password" feature.
+8. **Confirmation email** on change. ⚠️ CONFIRM — Supabase sends one for email changes;
+   for password changes it depends on project settings. If it doesn't, the account owner
+   gets no signal that their password was changed by someone else.
 
 ---
 
-## Analytics
+## Work breakdown
 
-| Event | Properties |
-|-------|-----------|
-| `change_password_opened` | `source: settings` |
-| `change_password_submitted` | — |
-| `change_password_failed` | `reason: <error code>` |
-| `change_password_succeeded` | — |
-
-🔒 Never attach password values or lengths.
+| Task | Owner | Blocking? |
+|------|-------|-----------|
+| Settings screen / IA | Design + Web + Mobile | 🔴 Yes |
+| Decide Option A vs B (recommend B) | Backend | 🔴 Yes |
+| Decide `code` field vs `403` for wrong password | Backend | 🔴 Yes |
+| `POST /api/account/change-password` route | Gateway | 🔴 Yes |
+| `changePasswordSchema` + `passwordSchema` in `@edge/shared` | Shared | 🔴 Yes |
+| Decide revoke-others vs revoke-global | Product/Backend | 🟡 Soon |
+| Confirmation email on change | Backend | 🟡 Soon |
+| Form screen | Mobile (+ Web for parity) | |
 
 ---
 
 ## Acceptance checklist
 
-- [ ] Wrong current password shows an inline error and does **not** log the user out
+- [ ] 🔒 Wrong current password shows an inline error and does **not** sign the user out
+- [ ] 🔒 A signed-in session alone cannot change the password without the current one
 - [ ] New == current is rejected with a clear message
-- [ ] Policy matches web exactly at the boundary (test min length ±1 on both clients)
-- [ ] 64+ character password is accepted unmodified
+- [ ] Policy matches web exactly at the boundary (test min length ±1 on both)
+- [ ] 64+ character password accepted unmodified
 - [ ] OS password manager offers to update the saved entry
-- [ ] Rotated tokens persist — the next authenticated request succeeds
 - [ ] Other devices are signed out (verify on a second device)
 - [ ] Confirmation email arrives
 - [ ] Fields clear when the app is backgrounded
-- [ ] App-switcher snapshot does not show typed characters
-- [ ] OAuth-only account sees "Set password", not "Change password"
+- [ ] App-switcher snapshot shows no typed characters
 - [ ] "Forgot your current password?" routes into the reset flow
-- [ ] Rate limiting produces a countdown, not a generic error
+- [ ] `429` produces a countdown, not a generic error
+- [ ] `500` does not render the raw Supabase message
 - [ ] Screen reader announces which field failed
 - [ ] Airplane mode shows a network error, not "incorrect password"

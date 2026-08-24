@@ -1,146 +1,222 @@
 # 5. Friends Suggestion in Feed
 
+**Status:** 🆕 Not built — and unlike features 1–4, this one has **no foundation at all**.
+There is no social graph, no friendship concept, and no feed in the conventional sense.
 **Auth state:** Logged in
-**Depends on:** Feed list virtualization, friendship state machine
 
 ---
 
-## Purpose
+## Read this first
 
-Surfaces people the user may know, inline in the main feed, so they can send friend
-requests without leaving what they were doing.
+Features 1–4 add screens to an existing account system. This feature adds an entire
+**product surface** that does not exist:
 
-Two things make this harder than it looks:
+✅ VERIFIED — the complete data model is
+`Profile`, `Topic`, `UserTopic`, `Flashcard`, `UserFlashcard`, `PlacementQuestion`,
+`Session`, `Feedback`, `Message` (`packages/db/prisma/schema.prisma`). There is no
+relationship between two `Profile` rows anywhere in the schema. Users cannot see, find,
+or interact with each other in any way.
 
-1. It is a **second data source injected into a virtualized list**. Naive
-   implementations break scroll position, key stability, and recycling.
-2. **Friendship state is shared** with every other surface in the app (profile,
-   search, friends list, notifications). If the suggestion card owns its own copy of
-   that state, the UI goes inconsistent the moment the user acts anywhere else.
+So this is not a mobile task with a web reference to copy. It is:
 
-Solve both explicitly rather than discovering them in QA.
+1. A **product decision** — should a solo language-practice app have a social graph, and
+   what is it for?
+2. A **backend build** — two new tables, RLS, a suggestions endpoint, friend-request
+   endpoints.
+3. Only then, **client work** on web and mobile.
 
----
-
-## Placement in the feed
-
-⚠️ CONFIRM the cadence web uses and mirror it — a different cadence on mobile makes
-cross-platform engagement metrics incomparable.
-
-Typical pattern:
-
-- First suggestion block after the **3rd** feed item
-- Then every **15** items thereafter
-- At most **2–3** blocks per feed session
-
-Rules:
-
-- The block is a single feed item from the list's perspective — one entry in the data
-  array with a stable synthetic id (e.g. `suggestions:0`), so virtualization and key
-  extraction behave.
-- Never inject at index 0. A user opening the app should see content first.
-- 📱 MOBILE-ONLY: never inject a block **above** the user's current scroll position
-  after the list has rendered. Inserting above the viewport jumps the scroll and is
-  disorienting. Compute injection points when a page of feed data arrives, then leave
-  them fixed.
-- If fewer than **⚠️ CONFIRM (typically 3)** suggestions are available, render nothing
-  at all. Do not render a card with one person in it, and do not render an empty-state
-  card in the middle of a feed.
+⚠️ **CONFIRM the product intent before any of this is built.** Sections below specify the
+build assuming it is approved, in this codebase's idiom, so estimation is possible.
 
 ---
 
-## Anatomy
+## What "feed" means here
+
+There is no feed. The nearest surface is the **Playground dashboard**
+(`apps/web/src/routes/_authenticated.playground.index.tsx`), a stacked set of sections:
 
 ```
-┌──────────────────────────────────────────────┐
-│  People you may know               See all → │
-│  ┌────────┐ ┌────────┐ ┌────────┐            │
-│  │   ✕    │ │   ✕    │ │   ✕    │  →  scroll │
-│  │ avatar │ │ avatar │ │ avatar │            │
-│  │  Name  │ │  Name  │ │  Name  │            │
-│  │ 3 mut. │ │ 1 mut. │ │ 7 mut. │            │
-│  │ [Add]  │ │ [Add]  │ │ [Add]  │            │
-│  └────────┘ └────────┘ └────────┘            │
-└──────────────────────────────────────────────┘
+Playground
+├── Header — "Welcome back, {firstName}"
+├── Quick Access
+├── Recommended topics      ← from /api/recommendations, sliced to 4
+├── Recent sessions         ← from stats.recentSessions, sliced to 3
+└── Flashcards due
 ```
 
-**Header:** section title + "See all" → the full suggestions screen.
+⚠️ CONFIRM that "feed" means this dashboard. Assuming it does, friend suggestions become
+**one more section** — which is good news: the recommended-topics section is a working,
+shipped precedent for "server-ranked list rendered as a horizontal row of cards", and
+this feature should look and behave like its sibling.
 
-**Card:**
+Placement: ⚠️ CONFIRM with design. Suggest **below** recent sessions — the dashboard's
+job is getting the user practicing, and a social module above that competes with it.
 
-| Element | Notes |
-|---------|-------|
-| Avatar | Placeholder on missing/failed load. Never a broken image |
-| Display name | Max 2 lines, then ellipsis. Do not truncate to 1 line — many names wrap |
-| Reason line | "3 mutual friends" / "From your contacts" / "In Photography Club". Highest-signal element on the card; never omit it |
-| Primary action | `Add friend` → `Requested` after tap |
-| Dismiss (✕) | Top-right corner. Minimum 44×44pt hit area even though the glyph is small |
-
-**Layout:** horizontal scroller (`FlatList horizontal` / `LazyRow`). ⚠️ CONFIRM whether
-web uses a horizontal carousel or a vertical stack, and match — this is the most
-visible parity item.
-
-📱 MOBILE-ONLY: nest the horizontal list inside the vertical feed carefully. Set
-`nestedScrollEnabled` on Android, and make sure the horizontal gesture does not fight
-the vertical one. Test on a low-end Android device specifically; this is where it fails.
+Everything in generic guidance about "inject a card every 15 feed items" does **not
+apply here** — there is no infinite feed to inject into. It is a fixed section on a
+finite dashboard.
 
 ---
 
-## Actions
+## Schema 🆕
 
-### Add friend
+Following the repo's conventions: a timestamped file in `supabase/migrations/`, enum
+types declared like `20260507000000_add_enum_types.sql`, and a hand-synced update to
+`packages/db/prisma/schema.prisma`.
 
-**Optimistic**, with rollback. ⚠️ CONFIRM web behaves the same — earlier work on the
-web client measured optimistic friendship updates at ~120ms, so mobile should not
-introduce a spinner-and-wait round trip that feels slower.
+```sql
+-- supabase/migrations/<YYYYMMDDHHMMSS>_add_friendships.sql
 
-1. On tap, immediately set the card's state to `Requested` and disable the button.
-2. Fire `POST` in the background.
-3. On success, keep the state and reconcile with the server response.
-4. On failure, roll back to `Add friend` and show a non-blocking toast
-   ("Couldn't send request. Tap to retry.").
+CREATE TYPE "FriendshipStatus" AS ENUM ('pending', 'accepted', 'blocked');
 
-🔒 Optimism applies to the **UI only**. Never treat the request as sent for any purpose
-that has side effects (notifications, counters that persist) until the server confirms.
+CREATE TABLE friendships (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  requester_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  addressee_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  status       "FriendshipStatus" NOT NULL DEFAULT 'pending',
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT friendships_no_self CHECK (requester_id <> addressee_id)
+);
 
-**Card behavior after adding** — ⚠️ CONFIRM and match web:
+-- One relationship per pair, in either direction.
+CREATE UNIQUE INDEX friendships_pair_uq ON friendships (
+  LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id)
+);
+CREATE INDEX friendships_addressee_idx ON friendships (addressee_id, status);
+CREATE INDEX friendships_requester_idx ON friendships (requester_id, status);
 
-- **Option A** — card stays, showing `Requested` with an undo affordance. Clearer, and
-  allows correcting a mis-tap.
-- **Option B** — card animates out and the next suggestion slides in. Better throughput.
+CREATE TABLE suggestion_dismissals (
+  user_id       uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  dismissed_id  uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, dismissed_id)
+);
 
-Option A is safer on mobile, where mis-taps are common. Whichever web does, match it.
+-- 🔒 Required: RLS is on for every table in this project, with no policies,
+-- because all access goes through the gateway's service-role client.
+-- See packages/db/prisma/migrations/enable_rls.sql for the rationale.
+ALTER TABLE friendships            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE suggestion_dismissals  ENABLE ROW LEVEL SECURITY;
+```
 
-### Dismiss (✕)
+Notes:
 
-- Removes the card immediately with an animation.
-- Persists server-side so the person does not reappear on any device or on web.
-  ⚠️ CONFIRM the endpoint.
-- Offer **Undo** in a toast for ~5 seconds. Dismissal is easy to mis-tap given the small
-  target, and without undo the user has permanently removed someone they wanted.
-- If the block drops below the minimum count after dismissals, remove the entire block
-  rather than leaving a near-empty carousel.
-
-### Tap the card body
-
-Navigate to that user's profile. The whole card is tappable except the two controls.
-
-Ensure the tap target of ✕ and `Add` are excluded from the card's press handler — a
-mis-routed tap that opens a profile when the user meant to dismiss is a common bug.
-
-### See all
-
-Full-screen list of suggestions, same cards in a vertical layout, paginated.
-⚠️ CONFIRM this screen exists on web and mirror its content and ordering.
+- The `LEAST`/`GREATEST` unique index is what stops A→B and B→A both existing. Without
+  it, two users adding each other simultaneously creates a duplicate relationship — the
+  single most common bug in friendship schemas.
+- 🔒 `ON DELETE CASCADE` here, unlike the existing tables, so
+  [feature 3](./03-delete-account.md#deletion-order) does not need two more ordered
+  steps. Add them to that route's order if you choose not to cascade.
+- `profiles` currently exposes only `full_name` and `email`. ⚠️ CONFIRM what a user may
+  see about another user. 🔒 **`email` must never be returned** in a suggestion payload.
+  An avatar column does not exist and would need adding if the design has avatars.
 
 ---
 
-## Friendship state — shared, not local
+## Suggestions endpoint 🆕
 
-The suggestion card must read from and write to the **same** friendship store used by
-profile, search, and the friends list.
+Model it directly on `apps/gateway/src/routes/recommendations.ts` — same shape, same
+`limit`, same fallback discipline, same re-order-after-bulk-fetch trick.
 
-Required states:
+That route's structure (`routes/recommendations.ts`):
+
+1. `const limit = 10` (line 32)
+2. Fetch candidates
+3. Fetch the user's context in parallel
+4. Score each candidate with a small integer weight table (lines 97-109)
+5. `scored.sort((a, b) => b.score - a.score)` (line 110)
+6. Take `topIds`, fetch full rows with `.in("id", topIds)`, then **re-order to preserve
+   ranking** (lines 121-125) — because Postgres does not preserve `IN` order
+7. Wrap everything in `try/catch` with a simpler fallback query (line 126)
+
+Apply the same to people:
+
+```ts
+// apps/gateway/src/routes/friends.ts  🆕
+fastify.get("/api/friends/suggestions", async (request, reply) => {
+  const limit = 10;
+  // candidates: profiles excluding self, existing friendships (either direction),
+  //             pending requests, blocks, and dismissals
+  // signals (⚠️ CONFIRM weights with product):
+  //   +15  same italian_level                 — the strongest practice-partner signal
+  //   +8   adjacent CEFR level                — reuse cefrDistance() from recommendations.ts:13
+  //   +10  overlapping user_topics
+  //   +5   mutual friend
+  //   +3   active in the last 7 days (has a recent session)
+  //   -20  previously dismissed (or exclude outright)
+  return reply.send(toCamelCase(ordered));
+});
+```
+
+`cefrDistance()` (`routes/recommendations.ts:13-20`) is directly reusable. ⚠️ CONFIRM
+whether to extract it to a shared util rather than duplicating it.
+
+🔒 The response must expose only what the design needs — id, display name, level, the
+reason, mutual count. Never `email`, never internal `score`.
+
+**Response** (camelCase, via `toCamelCase`, per repo convention):
+
+```jsonc
+{
+  "suggestions": [
+    {
+      "user": { "id": "uuid", "fullName": "Sara Ahmed", "italianLevel": "B1" },
+      "reason": { "type": "SAME_LEVEL" },       // structured, not a sentence
+      "mutualCount": 3
+    }
+  ]
+}
+```
+
+🔒 `reason` must be **structured**, not a prebuilt English string. The client localizes
+and pluralizes it — this app's users are language learners, so "1 mutual friends" is a
+particularly bad look.
+
+### Friend request routes 🆕
+
+```
+POST   /api/friends/requests            { addresseeId }   → 201
+DELETE /api/friends/requests/:userId                      → 200  (cancel)
+POST   /api/friends/requests/:id/accept                   → 200
+POST   /api/friends/requests/:id/decline                  → 200
+GET    /api/friends                                       → accepted friends
+GET    /api/friends/requests                              → incoming/outgoing
+POST   /api/friends/suggestions/:userId/dismiss           → 200
+```
+
+All follow the existing route conventions: Zod schemas from `@edge/shared`, the
+`ZodError` → `400 { message: "Validation error", errors }` pattern from
+`routes/sessions.ts:9-19`, `toCamelCase` on the way out, `{ message }` errors.
+
+> **Accepting a friend request is a notification-worthy event, and there is no
+> notification system in this codebase.** ⚠️ CONFIRM whether one is in scope. If not,
+> requests are only discoverable by opening the app and looking — which materially
+> limits how well this feature can work. Say so to product before building it.
+
+---
+
+## Client — mobile
+
+### Data layer
+
+Mirror the web query-key conventions (`apps/web/src/hooks/use-api.ts`):
+
+| Key | Notes |
+|-----|-------|
+| `["friend-suggestions"]` | `staleTime: 5 * 60 * 1000`, matching `["recommendations"]` |
+| `["friends"]` | |
+| `["friend-requests"]` | |
+
+On a successful add, invalidate `["friend-suggestions"]` and `["friend-requests"]` —
+the existing code invalidates broadly rather than surgically (`useSendMessage`
+invalidates four keys), so follow that habit.
+
+### 🔒 Friendship state must be shared, not local to the card
+
+The moment a profile screen or a friends list exists, the suggestion card cannot own its
+own copy of "are we friends". Keep friendship status in **one** normalized store keyed by
+user id, and have every surface read from it.
 
 ```
 NONE ──add──► REQUEST_SENT ──accepted──► FRIENDS
@@ -151,181 +227,101 @@ NONE ──add──► REQUEST_SENT ──accepted──► FRIENDS
 NONE ──(they added you)──► REQUEST_RECEIVED ──accept──► FRIENDS
 ```
 
-Consequences that must be handled:
+### Section UI
 
-- User adds someone from the suggestion card, then opens their profile → profile shows
-  `Requested`, not `Add friend`.
-- User adds someone from search, scrolls the feed, and that person appears in a
-  suggestion block → the card must render `Requested`.
-- The other person accepts while the app is open → the card reflects `Friends`.
-- Someone the user is **already** friends with, or has a **pending request** with in
-  either direction, must never appear as a suggestion. Filter server-side, and filter
-  again client-side against the local friendship store as defense in depth — the
-  suggestions payload can be seconds stale.
+Match the dashboard's existing sections — a titled `section` with a horizontal row of
+cards, the same treatment recommended topics gets.
 
-**Implementation:** a normalized store keyed by user id, holding friendship status. The
-suggestion card subscribes to it. Do **not** copy the status into carousel-local state.
+| Element | Notes |
+|---------|-------|
+| Section title | "Practice partners" or similar. ⚠️ CONFIRM copy — "People you may know" implies a social network this product isn't |
+| Card: name | Max 2 lines then ellipsis |
+| Card: level badge | Reuse the existing `Badge` component's web styling for CEFR levels |
+| Card: reason line | "Also learning B1" / "3 mutual friends". Highest-signal element; never omit |
+| Card: primary action | `Add` → `Requested` |
+| Card: dismiss ✕ | 📱 Minimum 44×44pt hit area even though the glyph is small |
 
----
+**Empty state:** if fewer than ⚠️ CONFIRM (suggest 3) suggestions exist, render **no
+section at all**. The dashboard already degrades this way — it falls back to
+`topics?.slice(0, 4)` when recommendations are empty
+(`_authenticated.playground.index.tsx:35`).
 
-## Fetching and caching
+**Loading:** the web dashboard blocks on a single combined `isLoading` and shows one
+spinner (lines 25-33). 📱 **Do not copy that.** Suggestions must load independently — a
+slow social query must never delay the dashboard. Render the section's own skeleton, and
+🔒 if the request fails, render nothing and let the rest of the dashboard work.
 
-Suggestions are a **separate request** from the feed. Do not couple them.
+### Add — optimistic
 
-- Fetch once per feed session, in parallel with the first feed page.
-- Cache with a TTL — ⚠️ CONFIRM (15–60 minutes is typical). Suggestions are expensive
-  to compute server-side; do not refetch on every scroll.
-- Pull-to-refresh on the feed refreshes suggestions too.
-- Over-fetch: request ~20 and render ~10, so dismissals can be backfilled locally
-  without a round trip.
-- If the suggestions request **fails**, render no block. The feed must load normally.
-  🔒 A failure in a secondary growth surface must never block primary content.
-- Deduplicate against people already shown in an earlier block in the same session.
+1. On tap, set the card to `Requested` and disable the button immediately.
+2. Fire `POST /api/friends/requests`.
+3. On success, reconcile with the response.
+4. On failure, roll back and show a retry snackbar.
 
----
+🔒 Optimism is **UI only** — never treat the request as sent for anything with side
+effects until the server confirms.
 
-## Ranking signals
+⚠️ CONFIRM whether the card stays showing `Requested` (clearer, allows undo) or animates
+out (better throughput). Recommend staying — mis-taps are common on mobile.
 
-Ranking is computed server-side. Mobile does not rank — it renders `ranked` order as
-received. Listed here so the client can render the `reason` correctly, because the
-reason string should reflect the dominant signal.
+### Dismiss
 
-⚠️ CONFIRM which signals the backend uses and which reason strings it can return:
+- Remove immediately, persist via the dismiss endpoint.
+- Offer **Undo** in a snackbar for ~5s. The ✕ target is small and mis-taps are common;
+  without undo the user permanently loses someone they wanted.
+- If the section drops below the minimum after dismissals, remove the whole section.
 
-| Signal | Reason copy |
-|--------|-------------|
-| Mutual friends | "3 mutual friends" |
-| Shared group | "In Photography Club" |
-| Contact match | "From your contacts" |
-| Same school/workplace | "Works at Acme" |
-| Recently active / popular | *(no specific reason — fall back to generic)* |
+### Exclusions 🔒
 
-Prefer a server-supplied `reason` object over building the string on the client:
+Never suggest someone who is: the current user · already a friend · has a pending
+request in either direction · blocked in either direction · previously dismissed ·
+[deactivated or deleted](./04-deactivate-account.md).
 
-```json
-{ "reason": { "type": "MUTUAL_FRIENDS", "count": 3 } }
-```
+Enforced server-side in the query; mirrored client-side against the friendship store as
+defense in depth, because the payload can be seconds stale.
 
-The client localizes and pluralizes it. Never render a server-supplied English sentence
-directly — it will not localize, and "1 mutual friends" is the inevitable bug.
-
-📱 MOBILE-ONLY — contacts: if contact-based suggestions exist, uploading the address
-book requires an explicit permission prompt with a clear pre-prompt explaining why, and
-is subject to App Store 5.1.2 and Play's data-safety disclosure. Do **not** silently
-request contacts permission because the suggestions feature exists. ⚠️ CONFIRM whether
-web has any equivalent (it likely does not), and treat this as a separate feature with
-its own consent flow rather than folding it in here.
+> **⚠️ This is where [feature 4](./04-deactivate-account.md) stops being simple.** That
+> document notes the app has no social surface, so deactivation is only about API access.
+> The moment friendships exist, a deactivated user must be excluded from suggestions and
+> rendered as a placeholder anywhere a person appears. Revisit feature 4 if this ships.
 
 ---
 
-## Exclusions
+## Performance 📱
 
-Never suggest someone who is:
-
-- The current user
-- Already a friend
-- Has a pending request in **either** direction
-- Blocked by, or has blocked, the current user 🔒
-- Previously dismissed by the current user
-- [Deactivated](./04-deactivate-account.md) or deleted 🔒
-- ⚠️ CONFIRM any additional product rules (age-based restrictions, region gating,
-  privacy setting "don't suggest me to others")
-
-All enforced server-side. Mirror the ones the client can evaluate (self, friend,
-pending, dismissed, deactivated) as a second line of defense — a stale payload
-suggesting a blocked user is a serious bug, not a cosmetic one.
+- Cards must be recycled — `FlatList`/`LazyRow`, never a `ScrollView` with `.map()`.
+- Fixed card dimensions so item layout can be precomputed.
+- Memoize the card; a dashboard re-render must not re-render every card.
+- 📱 Nest the horizontal list inside the vertical dashboard carefully:
+  `nestedScrollEnabled` on Android, and verify the horizontal gesture doesn't fight the
+  vertical one. Test on a low-end Android device specifically — this is where it fails.
+- Animate card removal **within** the section only; a layout animation that reflows the
+  whole dashboard will jank.
+- ⚠️ The gateway's 60/min rate limit is shared app-wide (`server.ts:68`). A dashboard
+  that already fires topics + stats + sessions + decks + recommendations is at 5
+  requests per load; adding suggestions makes 6. Pull-to-refresh multiplies it. Watch it.
 
 ---
 
-## API contract
+## Privacy 🔒
 
-⚠️ CONFIRM routes and fields.
+This is the section to take to whoever owns privacy before building.
 
-### Fetch suggestions
-
-```http
-GET /friends/suggestions?limit=20&cursor=<cursor>
-Authorization: Bearer <accessToken>
-```
-
-```jsonc
-{
-  "suggestions": [
-    {
-      "user": {
-        "id": "u_123",
-        "displayName": "Sara Ahmed",
-        "avatarUrl": "https://...",
-        "username": "sara"
-      },
-      "reason": { "type": "MUTUAL_FRIENDS", "count": 3 },
-      "mutualFriends": [ { "id": "u_9", "avatarUrl": "..." } ],  // for a stacked-avatar UI
-      "score": 0.87   // debug only — never rendered
-    }
-  ],
-  "nextCursor": "..."
-}
-```
-
-### Send friend request
-
-```http
-POST /friends/requests
-{ "userId": "u_123" }
-```
-
-| Status | `code` | Client action |
-|--------|--------|---------------|
-| `200`/`201` | — | Confirm optimistic state |
-| `409` | `ALREADY_FRIENDS` / `REQUEST_EXISTS` | **Not an error.** Reconcile to the real state, no toast |
-| `403` | `BLOCKED` | Silently remove the card. 🔒 Do not reveal that a block exists |
-| `404` | `USER_NOT_FOUND` | Remove the card silently |
-| `429` | `RATE_LIMITED` | Roll back, show a cooldown message |
-
-### Cancel a sent request (undo)
-
-```http
-DELETE /friends/requests/{userId}
-```
-
-### Dismiss a suggestion
-
-```http
-POST /friends/suggestions/{userId}/dismiss
-```
-
-Fire-and-forget from the UI's perspective; the card is removed optimistically. If it
-fails, the person may reappear on the next fetch — acceptable, but log it.
-
----
-
-## Performance
-
-📱 The suggestions block sits inside the app's most performance-sensitive screen.
-
-- Cards must be **recycled**, not all mounted. Use `FlatList`/`LazyRow`, never a
-  `ScrollView` containing a `.map()`.
-- `getItemLayout` / fixed item sizes where possible — card size is uniform, so provide
-  it and skip measurement.
-- Avatars: fixed dimensions, cached, downsampled to display size. Never load a 1024px
-  avatar into a 56px view.
-- Memoize the card component; a feed re-render must not re-render every card.
-- Prefetch the next few avatars as the carousel scrolls.
-- Do not animate card removal with a layout animation that reflows the parent feed list
-  — animate within the carousel only, or the whole feed janks.
-
----
-
-## Impression tracking
-
-⚠️ CONFIRM whether web tracks impressions and how, so metrics are comparable.
-
-An impression fires when a card is ≥50% visible for ≥1s. Use the list's
-`onViewableItemsChanged` with `viewabilityConfig: { itemVisiblePercentThreshold: 50,
-minimumViewTime: 1000 }`.
-
-Fire **once per card per session** — deduplicate by user id. Repeated impressions from
-scrolling back and forth destroy the click-through-rate metric.
+1. **Never return `email`** in any suggestion or friend payload. `profiles.email` is
+   `@unique` and is the login identifier.
+2. **`fullName` becomes visible to strangers.** Today it is collected at sign-up
+   (`apps/web/src/lib/auth.ts:45,56`) and shown only to its owner. Making it discoverable is
+   a change in what users consented to. ⚠️ CONFIRM whether existing users must opt in,
+   and whether a separate display name / username is needed.
+3. **`italianLevel` becomes visible.** Proficiency is mildly sensitive. ⚠️ CONFIRM.
+4. **Add a "don't suggest me to others" setting.** It belongs in the same settings
+   surface features 2–4 need, and 🔒 it should exist from day one, not be retrofitted.
+5. **Mutual-friend counts leak graph structure.** Showing a count is generally fine;
+   showing *who* requires the mutual friend's consent. ⚠️ CONFIRM before rendering names
+   or avatars.
+6. **Blocks must be invisible.** A blocked relationship must be indistinguishable from
+   the user not existing — no distinct copy, no distinct error, no timing difference.
+7. **Never render `score`** or any internal ranking value.
 
 ---
 
@@ -333,79 +329,63 @@ scrolling back and forth destroy the click-through-rate metric.
 
 | Case | Expected behavior |
 |------|-------------------|
-| Fewer than the minimum suggestions | Render no block at all |
-| All cards in a block dismissed | Remove the block; do not show an empty state |
-| Suggestions request fails | Feed renders normally with no block |
-| Suggestions request slow | Feed renders immediately; block appears when ready, but only **below** the current scroll position |
-| Person accepts the request while the card is on screen | Card updates to `Friends` |
-| User is offline | No block. Do not queue friend requests for later replay |
-| Add tapped twice rapidly | Debounce; exactly one request sent |
-| Dismiss and add tapped near-simultaneously | Whichever registers first wins; the other is a no-op |
-| Suggested user deactivates mid-session | Card removed on next fetch; if tapped, the profile shows "unavailable" |
-| Suggested user blocks the current user mid-session | `403` on add → card removed silently 🔒 |
-| Same person appears in two blocks | Must not happen — deduplicate across blocks in a session |
-| Rotation / fold state change | Carousel scroll position preserved |
-| RTL locale | Carousel scrolls right-to-left; ✕ moves to the top-**left**. Test in Arabic |
-| Very long display name | Wraps to 2 lines, then ellipsis; card height stays uniform |
+| Fewer than the minimum suggestions | No section rendered |
+| Suggestions request fails | Dashboard renders normally, no section 🔒 |
+| Suggestions slow | Dashboard renders immediately; section fills in when ready |
+| All cards dismissed | Section removed, no empty state |
+| Add tapped twice rapidly | Debounced; exactly one request |
+| Both users add each other simultaneously | 🔒 The `LEAST`/`GREATEST` unique index rejects the second; the route must catch it and resolve to `FRIENDS` rather than surfacing a `500` |
+| Add returns 409 (already friends / request exists) | Reconcile silently — not an error toast |
+| Blocked user | `403` → remove the card silently 🔒 |
+| Suggested user deactivates mid-session | Excluded on next fetch; tapping shows "unavailable" |
+| Suggested user deletes their account | `ON DELETE CASCADE` removes the friendship rows; the card 404s → remove silently |
+| Same person in two sections | Deduplicate within a session |
+| RTL locale | Carousel scrolls right-to-left; ✕ moves to the top-**left**. This app's learner base makes RTL likely — test in Arabic |
+| Very long `fullName` | Wraps to 2 lines then ellipsis; card height stays uniform |
+| Rate limit hit | `429` → back off; do not retry in a loop |
 
 ---
 
-## Security and privacy
+## Work breakdown
 
-🔒 All mandatory:
-
-1. **Never reveal blocks.** A blocked relationship must be indistinguishable from the
-   user simply not existing. No distinct error copy, no distinct behavior.
-2. **Never render `score`** or any internal ranking value.
-3. **Mutual-friend details respect privacy settings.** ⚠️ CONFIRM whether mutual-friend
-   avatars may be shown when the mutual friend's list is private — this is a real leak
-   vector.
-4. **No contacts upload without explicit consent** and a clear pre-prompt.
-5. **Dismissals are per-user and server-persisted**, never inferable by anyone else.
-6. **Deactivated and deleted users are excluded**, enforced server-side.
-
----
-
-## Analytics
-
-⚠️ CONFIRM names against web.
-
-| Event | Properties |
-|-------|-----------|
-| `friend_suggestions_shown` | `count`, `position_in_feed` |
-| `friend_suggestion_impression` | `suggested_user_id`, `reason_type`, `rank` |
-| `friend_suggestion_add_tapped` | `suggested_user_id`, `reason_type`, `rank` |
-| `friend_suggestion_add_failed` | `reason: <error code>` |
-| `friend_suggestion_dismissed` | `suggested_user_id`, `rank` |
-| `friend_suggestion_dismiss_undone` | `suggested_user_id` |
-| `friend_suggestion_profile_opened` | `suggested_user_id`, `rank` |
-| `friend_suggestions_see_all_tapped` | — |
-
-`rank` on every event is what makes the ranking model evaluable. Do not omit it.
+| Task | Owner | Blocking? |
+|------|-------|-----------|
+| **Product decision: does this app have a social graph?** | Product | 🔴 Yes — everything |
+| Privacy review of exposing `fullName` / `italianLevel` | Product + Legal | 🔴 Yes |
+| Confirm "feed" = Playground dashboard | Product + Design | 🔴 Yes |
+| `friendships` + `suggestion_dismissals` migration + RLS + Prisma sync | Backend | 🔴 Yes |
+| Friend request routes | Gateway | 🔴 Yes |
+| `GET /api/friends/suggestions` + scoring weights | Gateway | 🔴 Yes |
+| Zod schemas in `@edge/shared` | Shared | 🔴 Yes |
+| "Don't suggest me" privacy setting | Backend + Clients | 🟡 Soon |
+| Notification system for accepted requests | Backend | 🟡 Decide |
+| Avatar column, if the design has avatars | Backend | 🟡 If needed |
+| Revisit [feature 4](./04-deactivate-account.md) exclusions | Backend | 🟡 After |
+| Shared friendship store | Mobile | |
+| Dashboard section + cards | Mobile (+ Web for parity) | |
 
 ---
 
 ## Acceptance checklist
 
-- [ ] Block appears at the confirmed feed positions, matching web
-- [ ] Never injected above the current scroll position after render
-- [ ] Fewer than the minimum → no block rendered
-- [ ] Suggestions request failure does not block the feed
+- [ ] 🔒 No suggestion payload contains an email address
+- [ ] 🔒 Suggestions request failure does not block the dashboard
+- [ ] 🔒 Suggestions load independently — a slow query does not delay other sections
+- [ ] Fewer than the minimum → no section rendered
 - [ ] Add is optimistic and rolls back on failure
-- [ ] `409 ALREADY_FRIENDS` is reconciled silently, not shown as an error
-- [ ] Adding here updates the profile screen's state, and vice versa
+- [ ] `409` is reconciled silently, not shown as an error
+- [ ] Simultaneous mutual add resolves to friends, not a `500`
+- [ ] Adding here updates every other surface showing that user
 - [ ] Already-friends and pending-request users never appear
-- [ ] Blocked users never appear, and `403` removes the card silently
-- [ ] Deactivated users never appear
+- [ ] Blocked users never appear; `403` removes the card silently
+- [ ] Deactivated and deleted users never appear
+- [ ] Deleting an account removes its friendship rows (cascade verified)
 - [ ] Dismiss persists across app restarts and to web
 - [ ] Undo restores the card
-- [ ] Card body tap opens the profile; ✕ and Add do not
-- [ ] ✕ hit area is at least 44×44pt
-- [ ] Reason strings are localized and correctly pluralized ("1 mutual friend")
-- [ ] Horizontal scroll does not fight the feed's vertical scroll on low-end Android
+- [ ] ✕ hit area is at least 44×44pt and excluded from the card's tap handler
+- [ ] Reason strings are localized and correctly pluralized
 - [ ] RTL layout mirrors correctly
-- [ ] Long names wrap without changing card height
-- [ ] Impressions fire once per card per session
-- [ ] Cards are recycled — memory stays flat while scrolling a long feed
-- [ ] Feed scroll performance is unchanged with blocks present (measure frame drops)
-- [ ] Contacts permission, if used, has an explicit pre-prompt
+- [ ] Horizontal scroll does not fight the dashboard's vertical scroll on low-end Android
+- [ ] Cards are recycled — memory stays flat while scrolling
+- [ ] Dashboard request count and rate-limit headroom measured with the section present
+- [ ] "Don't suggest me to others" is honored
